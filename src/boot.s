@@ -20,8 +20,22 @@ section .text
     extern kernel_main
     global _start
     _start:
+        mov ebx, esp
         mov esp, $stack_top
-        call kernel_main
-        cli
-        hlt
-        jmp 1b
+        ;push 42
+        ;mov edi, 0
+        ;mov esi, 42
+        
+        push edi
+        call kernel_main    
+        pop eax
+
+        mov esp, ebx
+        ;cli
+        ;hlt
+        ;jmp 1b
+        
+        ;mov eax, 42
+        ret
+    param_conversion:
+        ret
