@@ -3,7 +3,7 @@ ASRC=${wildcard src/*.s}
 BUILDDIR=build
 OUTDIR=out
 
-all: setup asm gcc preLD LD 
+all: setup asm cc preLD LD 
 
 .PHONY: setup	
 setup:
@@ -15,15 +15,17 @@ setup:
 	fi
 
 asm:
-	nasm -felf32 ${ASRC}
-gcc:
-	i686-elf-gcc -c ${CSRC}
+	nasm -felf64 ${ASRC}
+cc:
+	clang -target x86_64-elf -ffreestanding -nostdlib -c ${CSRC}
+casm:
+	i686-elf-gcc -S ${CSRC}
 .PHONY: preLD
 preLD:
 	mv ${wildcard *.o} ${BUILDDIR}
 	mv ${wildcard src/*.o} ${BUILDDIR}
 LD:
-	i686-elf-gcc -T linker.ld -o ${OUTDIR}/kernel.bin -ffreestanding -nostdlib ${wildcard ${BUILDDIR}/*.o}
+	clang -T linker.ld -no-pie -o ${OUTDIR}/kernel.bin -ffreestanding -nostdlib ${wildcard ${BUILDDIR}/*.o}
 grub:
 	cp ${OUTDIR}/kernel.bin iso/boot/
 	grub-mkrescue -o ${OUTDIR}/boot.iso iso

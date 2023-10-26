@@ -21,19 +21,14 @@ section .text
     global _start
     _start:
         mov ebx, esp
-        mov esp, $stack_top
-        ;push 42
-        ;mov edi, 0
-        ;mov esi, 42
+        mov esp, $stack_top   
         
-        push edi
-        call kernel_main    
-        pop eax
-
-        mov esp, ebx
-        ;cli
-        ;hlt
-        ;jmp 1b
+        call kernel_main
+        
+        ;mov esp, ebx
+        cli
+        hlt
+        jmp 1b
         
         ;mov eax, 42
         ret
