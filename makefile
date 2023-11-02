@@ -1,9 +1,13 @@
 CSRC=${wildcard src/*.c}
-ASRC=${wildcard src/*.s}
-BUILDDIR=build
+ASRC= ${wildcard src/*.s}
+SOURCES := $(ASRC) $(CSRC)
+BUILDDIR=build/src
 OUTDIR=out
+OBJS:= $(SOURCES:%=build/%.o)
+SRCDIR=src
 
-all: setup asm cc preLD LD 
+
+all: setup $(OBJS) preLD LD 
 
 .PHONY: setup	
 setup:
@@ -14,16 +18,15 @@ setup:
 		mkdir -p "${OUTDIR}";\
 	fi
 
-asm:
-	nasm -felf64 ${ASRC}
-cc:
-	clang -target x86_64-elf -ffreestanding -nostdlib -c ${CSRC}
+$(BUILDDIR)%.s.o: $(SRCDIR)/%.s
+	nasm -felf64 $< -o $@
+$(BUILDDIR)%.c.o: $(SRCDIR)/%.c
+	clang -target x86_64-elf -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
+	
 casm:
 	i686-elf-gcc -S ${CSRC}
 .PHONY: preLD
 preLD:
-	mv ${wildcard *.o} ${BUILDDIR}
-	mv ${wildcard src/*.o} ${BUILDDIR}
 LD:
 	clang -T linker.ld -no-pie -o ${OUTDIR}/kernel.bin -ffreestanding -nostdlib ${wildcard ${BUILDDIR}/*.o}
 grub:
