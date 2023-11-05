@@ -20,6 +20,12 @@ section .text
     extern kernel_main
     global _start
     _start:
+
+        ;mov rdx,CR0                            ; Start probe, get CR0
+        ;and rdx, ~(1<<2)
+        ;mov CR0, rdx                            ; store control word
+        
+
         mov ebx, esp
         mov esp, $stack_top   
         

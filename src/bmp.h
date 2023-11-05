@@ -2,8 +2,11 @@
 #define BMP_H
 
 typedef struct BMP{
-    char* data;
-    unsigned short width, height;
+    unsigned width, height;
+    unsigned short bit_depth;
+    unsigned offset;
+    unsigned rowSize;
+    const char* data;
 } bmp_t;
 
 void ReadBMP(const char* file, bmp_t* bmp);

@@ -19,9 +19,9 @@ setup:
 	fi
 
 $(BUILDDIR)%.s.o: $(SRCDIR)/%.s
-	nasm -felf64 $< -o $@
+	nasm -felf64 -Fdwarf -g $< -o $@
 $(BUILDDIR)%.c.o: $(SRCDIR)/%.c
-	clang -target x86_64-elf -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
+	clang -target x86_64-elf -g -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
 	
 casm:
 	i686-elf-gcc -S ${CSRC}
@@ -36,7 +36,10 @@ grub:
 
 .PHONY: qemu
 qemu:
-	qemu-system-i386 -kernel ${OUTDIR}/kernel.bin
+	qemu-system-x86_64 -bios OVMF.fd -m 2G -cdrom out/boot.img
+
+mkimg:
+	sh mkimg.sh > /dev/null
 
 
 
