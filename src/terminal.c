@@ -19,15 +19,22 @@ static char text_buffer[BUFFER_SIZE];
 static uint32_t text_buffer_pos;
 
 static void StoreIntegerInBuffer(int32_t num){
-    uint32_t digitCount = count_digits(num);
-    //char* buffer_pos = text_buffer+text_buffer_pos;
-    for(uint32_t i = 0; i < digitCount; i++){
-        uint32_t digit = num % 10;
-        text_buffer[text_buffer_pos+(digitCount-1-i)] = digit+'0';
-        num /= 10;
-    }
-    text_buffer_pos+=digitCount;
+    uint32_t i = 0;
+    while(num){
+        int32_t digit = num % 10;
+        text_buffer[i+text_buffer_pos] = digit+'0';
+        num = num/10;
 
+        i++;
+    }
+    uint32_t old_pos = text_buffer_pos;
+    text_buffer_pos+=i;
+    for(uint32_t j = 0; j < i/2; j++){
+        char c = text_buffer[old_pos+j];
+        text_buffer[old_pos+j]=text_buffer[old_pos+(i-j)-1];
+        text_buffer[old_pos+(i-j-1)] = c;        
+    }
+    text_buffer[text_buffer_pos] = 0;
 }
 
 void InitializeTerminal(struct BootParam* bp)
@@ -64,7 +71,7 @@ void putChar(char c)
 
     
 
-    for(unsigned i = 0; i < font.height; i++){
+    for(unsigned i = 0; i < CHARACTER_SIZE; i++){
         char* fb_pos = offset+frameBuffer+(4*width*i);
         const char* font_pos = (frameBuffer_offset)+((font.height-i-1)*font.rowSize)+font.data-(font.rowSize*6)*rows_down;
 
@@ -85,19 +92,51 @@ void putChar(char c)
 
 void printf(const char *fmt, ...)
 {
-    StoreIntegerInBuffer(24);
-    flush();
-    // uint32_t param_count = 0;
-    // const char* current = fmt;
-    // while(current){
-    //     if(*current == '%'){
-    //         param_count++;
-    //     }
-    //     current++;
-    // }
-    
-    // va_list args;
-    // va_start(args, fmt);
+    va_list args;
+    va_start(args, fmt);
+    while (*fmt)
+    {
+        if(*fmt == '%'){
+            char specifier = *(fmt+1);
+            switch (specifier){
+                case 'd':
+                    {
+                        int32_t arg = va_arg(args, int32_t);
+                        StoreIntegerInBuffer(arg);
+                        
+                        break;
+                    }
+                case 'i':{
+                    int32_t arg = va_arg(args, int32_t);
+                    StoreIntegerInBuffer(arg);
+                    
+                    break;
+                }
+                case 'c':
+                    {
+                        char arg = (char)va_arg(args, int);
+                        text_buffer[text_buffer_pos] = arg;
+                        text_buffer_pos++;
+                        break;
+                    }
+                case 's':
+                    {
+                        const char* arg = va_arg(args, const char*);
+                        strcpy(text_buffer+text_buffer_pos, arg);
+                        text_buffer_pos+=strlen(arg);
+                    }
+            }
+            fmt+=2;
+        }
+        else{
+            text_buffer[text_buffer_pos] = *fmt;
+            text_buffer_pos++;
+            fmt++;
+        }
+        
+    }
+    text_buffer[text_buffer_pos] = 0;
+    va_end(args);
 }
 
 uint32_t flush(void)

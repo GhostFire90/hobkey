@@ -66,3 +66,4 @@ section .text
             test rdx, rdx
             jnz _memcmploop
         ret
+

@@ -16,7 +16,8 @@ int32_t kernel_main(struct BootParam* bp){
     
     //putChar('0');
 
-    printf("");
+    printf("hello: %d, %s",42069, "woo lesgo");
+    flush();
 
     while(1);
     return 0;

@@ -21,10 +21,12 @@ section .text
     global _start
     _start:
 
-        ;mov rdx,CR0                            ; Start probe, get CR0
-        ;and rdx, ~(1<<2)
-        ;mov CR0, rdx                            ; store control word
+        mov rdx,CR0                            ; Start probe, get CR0
+        and rdx, ~(1<<2)
+        and rdx, ~(1<<3)
         
+        mov CR0, rdx                            ; store control word
+        FNINIT   
 
         mov ebx, esp
         mov esp, $stack_top   
