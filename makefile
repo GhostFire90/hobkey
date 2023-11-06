@@ -41,6 +41,10 @@ qemu:
 mkimg:
 	sh mkimg.sh > /dev/null
 
+.PHONY: clean
+clean :
+	rm -r build/
+
 
 
 	

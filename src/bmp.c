@@ -1,5 +1,5 @@
 #include "bmp.h"
-#include "helpers.h"
+#include "string.h"
 #include <stdint.h>
 #include <byteswap.h>
 

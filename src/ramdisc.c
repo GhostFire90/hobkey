@@ -1,5 +1,5 @@
 #include "ramdisc.h"
-#include "helpers.h"
+#include "string.h"
 #define USTAR_SECTOR_SIZE 512
 #define USTAR_MAG_OFFSET 257
 #define USTAR_MAG_IDENT "ustar"

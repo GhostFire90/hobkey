@@ -8,7 +8,6 @@ struct BootParam;
 void InitializeTerminal(struct BootParam* bp);
 
 void putChar(char c);
-void printf(const char* fmt, ...);
-uint32_t flush(void);
-
+void write(const char* buff, uint32_t count);
+//void screenWipe();
 #endif
