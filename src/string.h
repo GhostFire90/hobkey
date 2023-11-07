@@ -10,6 +10,4 @@ void strcpy(char* dest, const char* src);
 int32_t strcmp(const char* first, const char* second);
 unsigned strlen(const char* str);
 
-uint32_t count_digits(int32_t num);
-
 #endif

@@ -8,6 +8,7 @@
 #include "stdlib.h"
 #include "terminal.h"
 
+
 int32_t kernel_main(struct BootParam* bp){
     //InitRamdisc(bp->ramDisc, bp->ramDiscSize);
     
@@ -15,10 +16,10 @@ int32_t kernel_main(struct BootParam* bp){
     
     InitializeTerminal(bp);
 
-    char num[33];
-    
-    write(num, strlen(num));
 
-    while(1);
+
+
+    while(1){
+    }
     return 0;
 }

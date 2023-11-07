@@ -5,7 +5,10 @@ char *itoa(int value, char *str, int base)
     unsigned i = 1;
     int sign = value < 0;
     str[0] = 0x0;
-
+    if(value == 0){
+        str[i] = '0';
+        i++;
+    }
     while(value){
         int digit = value % base;
         if (digit < 0) digit *= -1;
