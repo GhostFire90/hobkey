@@ -1,35 +1,23 @@
-ALI equ 1<<0
-MEMINFO equ 1<<1
-FLAGS equ ALI | MEMINFO
-MAGIC equ 0x1BADB002
-CHECKSUM equ -(MAGIC + FLAGS)
-
-section .multiboot
-    ALIGN 4
-    dd MAGIC
-    dd FLAGS
-    dd CHECKSUM
-
 section .bss
-    ALIGN 16
-    stack_bottom:
-        TIMES 16384 db
-    stack_top:
+    ;ALIGN 16
+    ;stack_bottom:
+    ;    TIMES 16384 db
+    ;stack_top:
 
 section .text
     extern kernel_main
     global _start
     _start:
 
-        mov rdx,CR0                            ; Start probe, get CR0
-        and rdx, ~(1<<2)
-        and rdx, ~(1<<3)
-        
-        mov CR0, rdx                            ; store control word
-        FNINIT   
+        ;mov rdx,CR0                            ; Start probe, get CR0
+        ;and rdx, ~(1<<2)
+        ;and rdx, ~(1<<3)
+        ;
+        ;mov CR0, rdx                            ; store control word
+        ;FNINIT   
 
-        mov ebx, esp
-        mov esp, $stack_top   
+        ;mov ebx, esp
+        ;mov esp, $stack_top   
         
         call kernel_main
         

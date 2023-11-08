@@ -2,10 +2,10 @@
 #define TERMINAL_H
 
 #include <stdint.h>
+#include <limine.h>
 
-struct BootParam;
 
-void InitializeTerminal(struct BootParam* bp);
+void InitializeTerminal(struct limine_file* ramdisc, struct limine_framebuffer* fb);
 
 void putChar(char c);
 void write(const char* buff, uint32_t count);

@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include "ramdisc.h"
 #include "stdlib.h"
+#include <limine.h>
 
 #define CHARACTER_SIZE 6
 
@@ -17,13 +18,13 @@ static uint64_t font_size;
 
 
 
-void InitializeTerminal(struct BootParam* bp)
+void InitializeTerminal(struct limine_file* ramdisc, struct limine_framebuffer* fb)
 {
-    ReadBMP(FindFile(bp->ramDisc, bp->ramDiscSize, "resources/font.bmp", &font_size), &font);
+    ReadBMP(FindFile(ramdisc->address, ramdisc->size, "resources/font.bmp", &font_size), &font);
     x_offset = y_offset = 0;
-    width = bp->resX;
-    height = bp->resY;
-    frameBuffer = bp->frameBuffer;
+    width = fb->width;
+    height = fb->height;
+    frameBuffer = (char*)fb->address;
 }
 
 

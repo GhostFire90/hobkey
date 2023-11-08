@@ -5,6 +5,8 @@ BUILDDIR=build/src
 OUTDIR=out
 OBJS:= $(SOURCES:%=build/%.o)
 SRCDIR=src
+LIMINE_ROOT = limine_iso
+LIMINE_INSTALL_DIR = /usr/local/share/limine
 
 
 all: setup $(OBJS) preLD LD 
@@ -29,14 +31,31 @@ casm:
 preLD:
 LD:
 	clang -T linker.ld -no-pie -o ${OUTDIR}/kernel.bin -ffreestanding -nostdlib ${wildcard ${BUILDDIR}/*.o}
-grub:
-	cp ${OUTDIR}/kernel.bin iso/boot/
-	grub-mkrescue -o ${OUTDIR}/boot.iso iso
 
+
+
+limine: LIMINE_SETUP
+	@cp ${OUTDIR}/kernel.bin ${LIMINE_ROOT}/boot
+	xorriso -as mkisofs -b limine-bios-cd.bin \
+        -no-emul-boot -boot-load-size 4 -boot-info-table \
+        --efi-boot limine-uefi-cd.bin \
+        -efi-boot-part --efi-boot-image --protective-msdos-label \
+        ${LIMINE_ROOT} -o ${OUTDIR}/boot.iso
+LIMINE_SETUP:
+	@if [ ! -d "${LIMINE_ROOT}" ]; then \
+		mkdir -p "${LIMINE_ROOT}"/EFI/BOOT; \
+		cp "${LIMINE_INSTALL_DIR}"/limine-uefi-cd.bin "${LIMINE_ROOT}"; \
+		cp "${LIMINE_INSTALL_DIR}"/limine-bios-cd.bin "${LIMINE_ROOT}"; \
+		cp "${LIMINE_INSTALL_DIR}"/limine-bios.sys "${LIMINE_ROOT}"; \
+		cp "${LIMINE_INSTALL_DIR}"/BOOTX64.EFI "${LIMINE_ROOT}"/EFI/BOOT; \
+		cp limine.cfg "${LIMINE_ROOT}"; \
+		mkdir "${LIMINE_ROOT}"/boot; \
+	fi
+		
 
 .PHONY: qemu
 qemu:
-	qemu-system-x86_64 -bios OVMF.fd -m 2G -cdrom out/boot.img
+	qemu-system-x86_64 -bios OVMF.fd -m 2G -cdrom ${OUTDIR}/boot.iso
 
 mkimg:
 	sh mkimg.sh > /dev/null
@@ -44,6 +63,9 @@ mkimg:
 .PHONY: clean
 clean :
 	rm -r build/
+
+ramdisc: LIMINE_SETUP
+	@cd initrd && tar -cvf ../${LIMINE_ROOT}/boot/initrd.tar --format=ustar * && cd -
 
 
 

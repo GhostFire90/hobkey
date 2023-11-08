@@ -2,3 +2,5 @@ build/
 iso/
 out/
 .vscode/
+OVMF.fd
+limine_iso/
