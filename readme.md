@@ -7,7 +7,7 @@ Hobkey is a playground for messing around with kernel level things for me, a lea
 ## Build
 
 ### Prereq
-(Follow the Limine Install guide)[https://github.com/limine-bootloader/limine#installing-limine-binaries]
+[Follow the Limine Install guide](https://github.com/limine-bootloader/limine#installing-limine-binaries)
 
 ### steps
 Run:
@@ -16,4 +16,4 @@ then for quickstart run `make limine qemu` and it will run in qemu if installed
 
 
 ## Acknowledgments
-As mentioned previously this uses the limine protocol and my image creation uses the limine bootloader, you can find those (here)[https://github.com/limine-bootloader/limine] 
+As mentioned previously this uses the limine protocol and my image creation uses the limine bootloader, you can find those [here](https://github.com/limine-bootloader/limine) 
