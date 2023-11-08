@@ -34,7 +34,7 @@ LD:
 
 
 
-limine: LIMINE_SETUP
+limine: LIMINE_SETUP ramdisc
 	@cp ${OUTDIR}/kernel.bin ${LIMINE_ROOT}/boot
 	xorriso -as mkisofs -b limine-bios-cd.bin \
         -no-emul-boot -boot-load-size 4 -boot-info-table \
