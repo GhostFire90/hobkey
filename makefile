@@ -20,7 +20,7 @@ setup:
 		mkdir -p "${OUTDIR}";\
 	fi
 
-$(BUILDDIR)%.s.o: $(SRCDIR)%.s
+$(BUILDDIR)%.s.o: $(SRCDIR)/%.s
 	nasm -felf64 -Fdwarf -g $< -o $@
 $(BUILDDIR)%.c.o: $(SRCDIR)/%.c
 	clang -target x86_64-elf -g -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
