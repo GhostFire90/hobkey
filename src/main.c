@@ -23,7 +23,7 @@ struct limine_module_request initrd_req = {
 
 
 int32_t kernel_main(void){
-    //InitRamdisc(bp->ramDisc, bp->ramDiscSize);
+    InitializeRamdisc(initrd_req.response->modules[0]->address, initrd_req.response->modules[0]->size);
     //memset(bp->frameBuffer, 0x00, (bp->resX*4)*(bp->resY*4));
 
     struct limine_framebuffer *fb = frame_buffer_req.response->framebuffers[0];
