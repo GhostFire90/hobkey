@@ -15,7 +15,6 @@ section .data
 
 
 section .text
-    extern create_gdt
     global setGdt
     setGdt:
         ;lea rdi, [gdt_desc]

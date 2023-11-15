@@ -20,7 +20,7 @@ static uint64_t font_size;
 
 void InitializeTerminal(struct limine_file* ramdisc, struct limine_framebuffer* fb)
 {
-    ReadBMP(FindFile(ramdisc->address, ramdisc->size, "resources/font.bmp", &font_size), &font);
+    ReadBMP(FindFile("resources/font.bmp", &font_size), &font);
     x_offset = y_offset = 0;
     width = fb->width;
     height = fb->height;

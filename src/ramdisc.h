@@ -23,7 +23,8 @@ struct FileInfo{
     
 };
 
-unsigned char *FindFile(char* ramdiscLocation, unsigned long ramdiscSize, const char *path, unsigned long* fileSize);
+void InitializeRamdisc(char* ramdiscLocation, unsigned long ramdiscSize);
+unsigned char *FindFile(const char *path, unsigned long* fileSize);
 int GetFileInfo(unsigned char* address, struct FileInfo *ret);
 
 

@@ -11,6 +11,9 @@
 #define USTAR_SIZE_OFFSET 124
 #define USTAR_SIZE_LENGTH 12
 
+char *ramdiscLocation;
+unsigned long ramdiscSize;
+
 static unsigned long FileSizeFromOctal(const unsigned char* input, unsigned long len){
     unsigned long ret = 0;
     unsigned long startIndex = 0;
@@ -49,8 +52,13 @@ int GetFileInfo(unsigned char* address, struct FileInfo *ret){
     return 0;
 }
 
+void InitializeRamdisc(char *ramdiscLocation_, unsigned long ramdiscSize_)
+{
+    ramdiscLocation = ramdiscLocation_;
+    ramdiscSize = ramdiscSize_;
+}
 
-unsigned char *FindFile(char* ramdiscLocation, unsigned long ramdiscSize, const char *path, unsigned long* fileSize)
+unsigned char *FindFile(const char *path, unsigned long *fileSize)
 {
     unsigned sectorCount = 0;
     struct FileInfo f;
