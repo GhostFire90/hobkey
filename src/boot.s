@@ -6,6 +6,7 @@ section .bss
 
 section .text
     extern kernel_main
+    extern setGdt
     global _start
     _start:
 
@@ -17,12 +18,13 @@ section .text
         ;FNINIT   
 
         ;mov ebx, esp
-        ;mov esp, $stack_top   
-        
+        ;mov esp, $stack_top  
+        cli
+        call setGdt
         call kernel_main
         
         ;mov esp, ebx
-        cli
+        
         hlt
         jmp 1b
         

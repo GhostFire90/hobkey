@@ -9,7 +9,6 @@
 #include "terminal.h"
 #include <limine.h>
 
-
 LIMINE_BASE_REVISION(1)
 
 struct limine_framebuffer_request frame_buffer_req = {
