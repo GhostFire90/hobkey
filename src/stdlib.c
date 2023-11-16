@@ -21,7 +21,7 @@ char *itoa(int value, char *str, int base)
         }
         i++;
     }
-    if(sign){
+    if(sign && base == 10){
         str[i] = '-';
         i++;
     }
