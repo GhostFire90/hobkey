@@ -21,14 +21,21 @@ struct limine_module_request initrd_req = {
     .revision = 0
 };
 
+#include "psf.h"
+
 
 int32_t kernel_main(void){
     InitializeRamdisc(initrd_req.response->modules[0]->address, initrd_req.response->modules[0]->size);
     //memset(bp->frameBuffer, 0x00, (bp->resX*4)*(bp->resY*4));
 
     struct limine_framebuffer *fb = frame_buffer_req.response->framebuffers[0];
-    InitializeTerminal(initrd_req.response->modules[0], fb);
-    printf("Hello Limine\n");
+    psf_t font;
+    GetPsf(&font, "resources/zap-vga.psf");
+    
+
+    InitializeTerminal(fb);
+
+    printf("%08d", 10);
 
 
     while(1){

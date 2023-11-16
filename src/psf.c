@@ -5,6 +5,21 @@
 #include "ramdisc.h"
 #include "string.h"
 
+#define ROUND_UP_TO_POWER_OF_2(num) \
+    do {                             \
+        --(num);                     \
+        (num) |= (num) >> 1;         \
+        (num) |= (num) >> 2;         \
+        (num) |= (num) >> 4;         \
+        (num) |= (num) >> 8;         \
+        (num) |= (num) >> 16;        \
+        ++(num);                     \
+    } while (0)
+
+#define IS_POWER_OF_2(num) ((num) && !((num) & ((num) - 1)))
+
+
+
 void GetPsf(psf_t *psf, const char *path)
 {
     uint64_t size;
@@ -14,10 +29,10 @@ void GetPsf(psf_t *psf, const char *path)
         struct psf1_header* header = (struct psf1_header*)(file_data);
         psf->width = 8;
         psf->height = (uint32_t)header->dat[1];
-        psf->byte_count = psf->width*psf->height;
+        psf->byte_count = psf->width;
         psf->mode = (uint32_t)header->dat[0];
-        psf->data = file_data+sizeof(struct psf1_header);
-        psf->data_len = size-sizeof(struct psf1_header);
+        psf->data = file_data+4;
+        psf->data_len = size-4;
     }
     else if(memcmp(file_data, PSF2_MAG, 4) == 0){
         //is psf2

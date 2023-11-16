@@ -5,7 +5,7 @@
 #include <limine.h>
 
 
-void InitializeTerminal(struct limine_file* ramdisc, struct limine_framebuffer* fb);
+void InitializeTerminal(struct limine_framebuffer* fb);
 
 void putChar(char c);
 void write(const char* buff, uint32_t count);

@@ -1,7 +1,7 @@
 #include "terminal.h"
 #include "boot_param.h"
 #include <stdint.h>
-#include "bmp.h"
+#include "psf.h"
 #include "string.h"
 #include <stdarg.h>
 #include "ramdisc.h"
@@ -13,14 +13,15 @@
 static char* frameBuffer;
 static uint32_t width,height;
 static uint32_t x_offset, y_offset;
-static bmp_t font;
+static psf_t font;
 static uint64_t font_size;
 
 
 
-void InitializeTerminal(struct limine_file* ramdisc, struct limine_framebuffer* fb)
+void InitializeTerminal(struct limine_framebuffer* fb)
 {
-    ReadBMP(FindFile("resources/font.bmp", &font_size), &font);
+    GetPsf(&font, "resources/zap-vga.psf");
+    //ReadBMP(FindFile("resources/font.bmp", &font_size), &font_b);
     x_offset = y_offset = 0;
     width = fb->width;
     height = fb->height;
@@ -31,26 +32,35 @@ void InitializeTerminal(struct limine_file* ramdisc, struct limine_framebuffer* 
 
 void putChar(char c)
 {
+    
+    for(uint32_t y = 0; y < font.height; y++){
+        for(uint32_t x = 0; x < font.width; x++){
+            int on = font.data[y*(font.width/8)+c*(font.height*(font.width/8))] & (1<<(font.width-x-1));
+            uint32_t pix = 0xFFFFFFFF*on;
+            memcpy(((char*)frameBuffer)+x_offset+(y_offset*(width*4))+(4*x)+(width*4*y), &pix, 4);
+            
+        }
+    }
+    x_offset+=font.width*4;
+    // uint32_t buff_stride = (font.bit_depth/8)*CHARACTER_SIZE;
+    // uint32_t frameBuffer_offset = c*buff_stride;
 
-    uint32_t buff_stride = (font.bit_depth/8)*CHARACTER_SIZE;
-    uint32_t frameBuffer_offset = c*buff_stride;
-
-    uint32_t rows_down = frameBuffer_offset/font.rowSize;
-    frameBuffer_offset -= font.rowSize*rows_down;
+    // uint32_t rows_down = frameBuffer_offset/font.rowSize;
+    // frameBuffer_offset -= font.rowSize*rows_down;
     
 
-    for(unsigned i = 0; i < CHARACTER_SIZE; i++){
-        char* fb_pos = (y_offset*width)+x_offset+frameBuffer+(4*width*i);
-        const char* font_pos = (frameBuffer_offset)+((font.height-i-1)*font.rowSize)+font.data-(font.rowSize*6)*rows_down;
+    // for(unsigned i = 0; i < CHARACTER_SIZE; i++){
+    //     char* fb_pos = (y_offset*width)+x_offset+frameBuffer+(4*width*i);
+    //     const char* font_pos = (frameBuffer_offset)+((font.height-i-1)*font.rowSize)+font.data-(font.rowSize*6)*rows_down;
 
-        memcpy(fb_pos, font_pos, buff_stride);
+    //     memcpy(fb_pos, font_pos, buff_stride);
         
-    }
-    x_offset+=buff_stride;
-    if(x_offset > buff_stride*width){
-        y_offset+=buff_stride;
-        x_offset = 0;
-    }
+    // }
+    // x_offset+=buff_stride;
+    // if(x_offset > buff_stride*width){
+    //     y_offset+=buff_stride;
+    //     x_offset = 0;
+    // }
     
 }
 
@@ -67,53 +77,88 @@ void printf(const char *fmt, ...)
     va_start(args, fmt);
     while (*fmt){
         if(*fmt == '%'){
-            char specifier = *(fmt+1);
+            int leading_zeros = 0; // mmm tasty
+            if(*++fmt == '0'){
+                fmt++;
+                leading_zeros = 1;
+            }
+            int width = 0;
+            while(*fmt >= '0' && *fmt <= '9'){
+                width = width*10+(*fmt - '0');
+                fmt++;
+            }
+
+
+            char specifier = *(fmt);
+            char buf[33];
             switch (specifier)
             {
             case 'i':
                 {
-                    char buf[33];
+                    
                     int arg = va_arg(args, int);
                     itoa(arg, buf, 10);
-                    write(buf, strlen(buf));
+                    
                 }
                 break;
             case 'd':
                 {
-                    char buf[33];
+                   
                     int arg = va_arg(args, int);
                     itoa(arg, buf, 10);
-                    write(buf, strlen(buf));
                 }
                 break;
             case 'x':
                 {
-                    char buf[33];
+
                     int arg = va_arg(args, int);
                     itoa(arg, buf, 16);
-                    write(buf, strlen(buf));
+                    
                 }
                 break;
+            case 'b':
+                {
+                    int arg = va_arg(args, int);
+                    itoa(arg, buf, 2);
+                }
+                break;
+
             case 's':
                 {
                     const char* arg = va_arg(args, const char*);
-                    write(arg, strlen(arg));
+                    
                 }
                 break;
             case 'c':
                 {
                     char arg = (char)va_arg(args, int);
-                    putChar(arg);
+                    buf[0] = arg;
+                    buf[1] = 0;
+                    //putChar(arg);
                 }
                 break;
 
             default:
                 break;
             }
-            fmt += 2;
+            int buf_len = strlen(buf);
+            if(width && buf_len < width){
+                width -= buf_len;
+                while(width--){
+                    if(leading_zeros)
+                        putChar('0');
+                    else
+                        putChar(' ');
+                }
+                
+            
+            }
+
+            write(buf, buf_len);
+            fmt++;
         }
         else if(*fmt == '\n'){
-            y_offset+=24;
+            y_offset+=font.height;
             x_offset = 0;
             fmt++;
         }
