@@ -7,6 +7,7 @@
 #include "string.h"
 #include "stdlib.h"
 #include "terminal.h"
+#include "idt.h"
 #include <limine.h>
 
 LIMINE_BASE_REVISION(1)
@@ -23,6 +24,8 @@ struct limine_module_request initrd_req = {
 
 #include "psf.h"
 
+const char* message = "Hello";
+
 
 int32_t kernel_main(void){
     InitializeRamdisc(initrd_req.response->modules[0]->address, initrd_req.response->modules[0]->size);
@@ -35,10 +38,6 @@ int32_t kernel_main(void){
 
     InitializeTerminal(fb);
 
-    printf("%08d", 10);
-
-
-    while(1){
-    }
+    
     return 0;
 }

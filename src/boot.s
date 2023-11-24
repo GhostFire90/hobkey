@@ -4,8 +4,12 @@ section .bss
     ;    TIMES 16384 db
     ;stack_top:
 
+section .data
+    message db "Hello"
+
 section .text
     extern kernel_main
+    extern setup_idt
     extern setGdt
     global _start
     _start:
@@ -21,8 +25,13 @@ section .text
         ;mov esp, $stack_top  
         cli
         call setGdt
+        call setup_idt
         call kernel_main
+        lea rdi, [message]
+        mov rsi, 5
+        int 0x01
         
+
         ;mov esp, ebx
         
         hlt

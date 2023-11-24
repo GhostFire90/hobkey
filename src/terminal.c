@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include "ramdisc.h"
 #include "stdlib.h"
+#include "idt.h"
 #include <limine.h>
 
 #define CHARACTER_SIZE 6
@@ -26,6 +27,8 @@ void InitializeTerminal(struct limine_framebuffer* fb)
     width = fb->width;
     height = fb->height;
     frameBuffer = (char*)fb->address;
+
+    setInterrupt(0x01, write, 0x8e);
 }
 
 
@@ -137,7 +140,16 @@ void printf(const char *fmt, ...)
                     //putChar(arg);
                 }
                 break;
-
+            case 'p':
+                {
+                    char buff[65];
+                    write("0x", 2);
+                    long long arg = va_arg(args, long long);
+                    lltoa(arg, buff, 16);
+                    write(buff, strlen(buff));
+                    memset(buf, 0x0, 33);
+                }
+                break;
             default:
                 break;
             }

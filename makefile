@@ -55,7 +55,12 @@ LIMINE_SETUP:
 
 .PHONY: qemu
 qemu:
-	qemu-system-x86_64 -bios OVMF.fd -m 2G -cdrom ${OUTDIR}/boot.iso
+	qemu-system-x86_64 -bios OVMF.fd -m 2G -cdrom ${OUTDIR}/boot.iso -no-reboot -no-shutdown -D qemu_log.txt
+
+.PHONY: qemu_gdb
+qemu_gdb:
+	qemu-system-x86_64 -cdrom out/boot.iso -bios OVMF.fd -s -S -d int -D qemu_log.txt -M smm=off &
+	gdb -x debug.gdb
 
 mkimg:
 	sh mkimg.sh > /dev/null
