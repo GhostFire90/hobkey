@@ -23,7 +23,9 @@ section .text
 
         ret
     refresh_idt:
+        cli
         lidt [idtr]
+        sti
         ret
 
     empty_int:

@@ -37,7 +37,8 @@ int32_t kernel_main(void){
     
 
     InitializeTerminal(fb);
+    printf("Hello world");
 
-    
+    while(1){}
     return 0;
 }
