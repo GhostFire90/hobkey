@@ -9,7 +9,7 @@ LIMINE_ROOT = limine_iso
 LIMINE_INSTALL_DIR = /usr/local/share/limine
 
 
-all: setup $(OBJS) preLD LD 
+all: setup $(OBJS) preLD LD limine 
 
 .PHONY: setup	
 setup:
@@ -68,6 +68,8 @@ mkimg:
 .PHONY: clean
 clean :
 	rm -r build/
+	rm -r out/
+	rm -r limine_iso
 
 ramdisc: LIMINE_SETUP
 	@cd initrd && tar -cvf ../${LIMINE_ROOT}/boot/initrd.tar --format=ustar * && cd -

@@ -23,13 +23,12 @@ section .text
 
         ;mov ebx, esp
         ;mov esp, $stack_top  
-        cli
+
         call setGdt
         call setup_idt
+    
         call kernel_main
-        lea rdi, [message]
-        mov rsi, 5
-        int 0x01
+        
         
 
         ;mov esp, ebx
