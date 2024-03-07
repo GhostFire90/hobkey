@@ -9,22 +9,26 @@
 #include "terminal.h"
 #include "idt.h"
 #include <limine.h>
-
+#include "PMM.h"
+#include "paging.h"
 LIMINE_BASE_REVISION(1)
 
-struct limine_framebuffer_request frame_buffer_req = {
+static struct limine_framebuffer_request frame_buffer_req = {
     .id = LIMINE_FRAMEBUFFER_REQUEST,
     .revision = 0
 };
 
-struct limine_module_request initrd_req = {
+static struct limine_module_request initrd_req = {
     .id = LIMINE_MODULE_REQUEST,
     .revision = 0
 };
 
+
+
 #include "psf.h"
 
 const char* message = "Hello";
+
 
 
 int32_t kernel_main(void){
@@ -35,9 +39,17 @@ int32_t kernel_main(void){
     psf_t font;
     GetPsf(&font, "resources/zap-vga.psf");
     
+    
 
     InitializeTerminal(fb);
-    printf("Hello world");
+
+    
+
+    //printf("MAX_PHY_BIT: %d\n", MAXPHYBIT);
+    //printf("Paging Mode: %d\n", paging_req.response->mode);
+    build_list();
+    initialize_paging();
+    
 
     while(1){}
     return 0;

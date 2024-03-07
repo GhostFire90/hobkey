@@ -60,4 +60,6 @@ SECTIONS
         *(.eh_frame)
         *(.note .note.*)
     }
+    . += CONSTANT(MAXPAGESIZE);
+    end_kernel = ALIGN(4K);
 }

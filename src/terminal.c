@@ -28,7 +28,7 @@ void InitializeTerminal(struct limine_framebuffer* fb)
     height = fb->height;
     frameBuffer = (char*)fb->address;
 
-    setInterrupt(0x01, write, 0x8e);
+    //setInterrupt(0x01, write, 0x8e);
 }
 
 
@@ -144,12 +144,18 @@ void printf(const char *fmt, ...)
                 {
                     char buff[65];
                     write("0x", 2);
-                    long long arg = va_arg(args, long long);
+                    unsigned long long arg = va_arg(args, unsigned long long);
                     lltoa(arg, buff, 16);
                     write(buff, strlen(buff));
                     memset(buf, 0x0, 33);
                 }
                 break;
+            case 'u':
+            {
+                uint32_t arg = va_arg(args, uint32_t);
+                uitoa(arg, buf, 10);
+            }
+
             default:
                 break;
             }
