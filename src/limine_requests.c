@@ -2,19 +2,22 @@
 #include <limine.h>
 
 
-static struct limine_memmap_request memmap_req = {
+static volatile struct limine_memmap_request memmap_req = {
     .id = LIMINE_MEMMAP_REQUEST,
-    .revision = 0
+    .revision = 0,
+    .response = 0x0
 };
 
-static struct limine_hhdm_request hhdm_req = {
+static volatile struct limine_hhdm_request hhdm_req = {
     .id = LIMINE_HHDM_REQUEST,
-    .revision = 0
+    .revision = 0,
+    .response = 0x0
 };
 
-static struct limine_kernel_address_request kernel_addr_request = {
+static volatile struct limine_kernel_address_request kernel_addr_request = {
     .id = LIMINE_KERNEL_ADDRESS_REQUEST,
     .revision = 0,
+    .response = 0x0
 };
 
 const struct limine_memmap_response *limine_memmap()
