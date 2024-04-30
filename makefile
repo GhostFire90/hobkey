@@ -9,7 +9,12 @@ LIMINE_ROOT = limine_iso
 LIMINE_INSTALL_DIR = /usr/local/share/limine
 
 
-all: setup $(OBJS) preLD LD limine 
+all: $(BUILDDIR) $(OUTDIR) $(OBJS) preLD LD limine 
+
+${BUILDDIR}:
+	mkdir -p ${BUILDDIR}
+${OUTDIR}:
+	mkdir -p ${OUTDIR}
 
 .PHONY: setup	
 setup:

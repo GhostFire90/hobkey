@@ -61,5 +61,5 @@ SECTIONS
         *(.note .note.*)
     }
     . += CONSTANT(MAXPAGESIZE);
-    end_kernel = ALIGN(4K);
+    _END_KERNEL = ALIGN(4K);
 }
