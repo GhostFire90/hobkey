@@ -26,9 +26,11 @@ setup:
 	fi
 
 $(BUILDDIR)%.s.o: $(SRCDIR)/%.s
-	nasm -felf64 -Fdwarf -g $< -o $@
+	@echo [Assembling] $< -> $@
+	@nasm -felf64 -Fdwarf -g $< -o $@
 $(BUILDDIR)%.c.o: $(SRCDIR)/%.c
-	clang -target x86_64-elf -g -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
+	@echo [Compiling] $< -> $@
+	@clang -target x86_64-elf -g -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
 	
 casm:
 	i686-elf-gcc -S ${CSRC}
@@ -41,7 +43,7 @@ LD:
 
 limine: LIMINE_SETUP ramdisc
 	@cp ${OUTDIR}/kernel.bin ${LIMINE_ROOT}/boot
-	xorriso -as mkisofs -b limine-bios-cd.bin \
+	@xorriso -as mkisofs -b limine-bios-cd.bin \
         -no-emul-boot -boot-load-size 4 -boot-info-table \
         --efi-boot limine-uefi-cd.bin \
         -efi-boot-part --efi-boot-image --protective-msdos-label \
