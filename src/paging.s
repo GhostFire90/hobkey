@@ -14,21 +14,6 @@ section .text
             jnz .cm_loop
         ret
     set_cr3:
-        
-        mov rbx, cr0
-        and ebx, ~(1<<31)
-        mov cr0, rbx
-
-        shl rdi, 12
         mov cr3, rdi
-
-        or ebx, (1<<31)
-        mov cr0, rbx
-
-        mov ax, 0x10
-        mov ds, ax
-        mov es, ax
-        mov fs, ax
-        mov gs, ax
-        
-        ret 
+        nop
+        ret

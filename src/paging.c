@@ -18,6 +18,14 @@ static const uint64_t base = 0x3;
 static uint64_t offset;
 static uint64_t mask;
 
+void set_pointer(uint64_t* entry, uint64_t pointer){
+    *entry |= (pointer&mask)<< 12L;
+}
+uint64_t get_pointer(uint64_t entry){
+    return (entry>>12L)&mask;
+}
+
+
 //layer 1
 void fill_pt(uint64_t* pt){
     for(uint32_t i = 0; i < 512; i++){
@@ -33,7 +41,7 @@ void fill_pdt(uint64_t* pdt){
         uint64_t entry = base;
         char* pg = get_page();
         allocate_page(pg+offset);
-        entry |= ((uint64_t)entry & mask) << 12;
+        set_pointer(&entry, (uint64_t)pg);
         fill_pt((uint64_t*)(pg+offset));
         pdt[i] = entry;
     }
@@ -43,16 +51,20 @@ void fill_pdt(uint64_t* pdt){
 //layer 3
 void fill_pdpt(uint64_t* pdpt){
     
-
+    int free_pages = page_count();
+    printf("Pages before: %d\n", free_pages);
     for(uint32_t i = 0; i < 512u; i++){
         uint64_t entry = base;
         char* pg = get_page();
         allocate_page(pg+offset);
-        entry |= ((uint64_t)entry & mask) << 12;
+        set_pointer(&entry, (uint64_t)pg);
         fill_pdt((uint64_t*)(pg+offset));
         pdpt[i] = entry;
 
     }
+    free_pages = page_count();
+    printf("Pages after: %d\n", free_pages);
+
 }
 
 void get_indexes(uint64_t addr, uint16_t indexes[4], uint16_t* offset){
@@ -64,6 +76,18 @@ void get_indexes(uint64_t addr, uint16_t indexes[4], uint16_t* offset){
 
 }
 
+
+void* sanity_check(uint64_t vaddr, uint64_t* pml4){
+    uint16_t indexes[4] = {0};
+    uint16_t page_offset = 0;
+    get_indexes(vaddr, indexes, &page_offset);
+    uint64_t* pdpt = (uint64_t*)(get_pointer(pml4[indexes[0]])+offset);
+    uint64_t* pdt = (uint64_t*)(get_pointer(pdpt[indexes[1]])+offset);
+    uint64_t* pt = (uint64_t*)(get_pointer(pdt[indexes[2]])+offset);
+    uint64_t ret = get_pointer(pt[indexes[3]]);
+    return (void*)ret;
+
+}
 
 void initialize_paging()
 {
@@ -80,34 +104,39 @@ void initialize_paging()
     PML4[0] = 0x3;
 
     mask = create_mask(MAXPHYBIT-1);
-    PML4[0] |= (((uint64_t)PDPT-offset)& mask) << 12L;
+    set_pointer(&PML4[0], (uint64_t)PDPT-offset);
+    //PML4[0] |= (((uint64_t)PDPT-offset)& mask) << 12L;
     fill_pdpt(PDPT);
     const struct limine_kernel_address_response* ka = limine_kernel_addr();
     uint64_t end_kernel = (uint64_t)&_END_KERNEL;
     uint64_t kernel_size = end_kernel - ka->virtual_base;
+
+    uint64_t kernel_page_count = kernel_size/PAGE_SIZE;
 
 
     printf("Page tables initialized, ready for transition\n");
     uint16_t indexes[4] = {0};
     uint16_t page_offset = 0;
     get_indexes(ka->virtual_base, indexes, &page_offset);
-    printf("PML4 index = %d\n", indexes[0]);
+    //printf("PML4 index = %d\n", indexes[0]);
 
     PML4[indexes[0]] = 0x3;
     uint64_t* kernel_pdpt = (uint64_t*)((char*)get_page()+offset);
     allocate_page(kernel_pdpt);
-    PML4[indexes[0]] |= (((uint64_t)PDPT-offset) & mask) << 12L;
+    set_pointer(&PML4[indexes[0]], (uint64_t)kernel_pdpt-offset);
+    //PML4[indexes[0]] |= (((uint64_t)PDPT-offset) & mask) << 12L;
     fill_pdpt(kernel_pdpt);
-    
 
+    // hate paging
+    // pdpte, the entry in the pdpt that the pointer references D:<
+    uint64_t* kernel_pdt = (uint64_t*)(get_pointer(kernel_pdpt[indexes[1]])+offset);
+    uint64_t* kernel_table = ((uint64_t*)(get_pointer(kernel_pdt[indexes[2]])+offset))+indexes[3];
+    uint64_t phy_addr = ka->physical_base;
+    for(uint64_t i = 0; i < kernel_page_count; i++, phy_addr+=PAGE_SIZE){
+        set_pointer(&kernel_table[i], phy_addr);
+    }
+    uint64_t test = (uint64_t)sanity_check(ka->virtual_base, PML4);
+    printf("break me!");
 
-    //set_cr3((char*)PML4-offset);
-    
-
-
-    
-
-
-
-
+    set_cr3(((char*)PML4)-offset);
 }
