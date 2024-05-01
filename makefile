@@ -7,7 +7,7 @@ OBJS:= $(SOURCES:%=build/%.o)
 SRCDIR=src
 LIMINE_ROOT = limine_iso
 LIMINE_INSTALL_DIR = /usr/local/share/limine
-
+MEMORY=3G
 
 all: $(BUILDDIR) $(OUTDIR) $(OBJS) preLD LD limine 
 
@@ -62,11 +62,11 @@ LIMINE_SETUP:
 
 .PHONY: qemu
 qemu:
-	qemu-system-x86_64 -bios OVMF.fd -m 2G -cdrom ${OUTDIR}/boot.iso -no-reboot -no-shutdown -D qemu_log.txt
+	qemu-system-x86_64 -bios OVMF.fd -m $(MEMORY) -cdrom ${OUTDIR}/boot.iso -no-reboot -no-shutdown -D qemu_log.txt
 
 .PHONY: qemu_gdb
 qemu_gdb:
-	qemu-system-x86_64 -cdrom out/boot.iso -bios OVMF.fd -m 2G -s -S -d int -D qemu_log.txt -M smm=off &
+	qemu-system-x86_64 -cdrom out/boot.iso -bios OVMF.fd -m $(MEMORY) -s -S -d int -D qemu_log.txt -M smm=off &
 	gdb -x debug.gdb
 
 mkimg:

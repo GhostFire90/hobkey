@@ -31,6 +31,10 @@ void* list_from_block(const struct limine_memmap_entry* entry, void* prev){
     }
     return prev;
 }
+
+int page_count(void){
+    return free_pages;
+}
 void build_list()
 {
     const struct limine_memmap_response* memmap = limine_memmap();
@@ -55,6 +59,7 @@ void allocate_page(void* vaddr){
     
     freepage_t* fp = (freepage_t*)vaddr;
     top = fp->previous;
+    free_pages--;
 }
 
 void free_page(void* page)
