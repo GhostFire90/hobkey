@@ -66,7 +66,7 @@ qemu:
 
 .PHONY: qemu_gdb
 qemu_gdb:
-	qemu-system-x86_64 -cdrom out/boot.iso -bios OVMF.fd -m $(MEMORY) -s -S -d int -D qemu_log.txt -M smm=off &
+	qemu-system-x86_64 -cdrom out/boot.iso -bios OVMF.fd -m $(MEMORY) -s -S -d int -D qemu_log.txt -M smm=off -no-reboot -no-shutdown &
 	gdb -x debug.gdb
 
 mkimg:

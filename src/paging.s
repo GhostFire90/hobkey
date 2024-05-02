@@ -13,7 +13,4 @@ section .text
             dec rdi
             jnz .cm_loop
         ret
-    set_cr3:
-        mov cr3, rdi
-        nop
-        ret
+
