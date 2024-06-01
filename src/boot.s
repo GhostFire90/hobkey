@@ -1,10 +1,12 @@
 section .bss
     global MAXPHYBIT
+    global stack_bottom
+    align 16
+    stack_bottom:
+        resb 16384
+    stack_top:
     MAXPHYBIT resb 1
-    ;ALIGN 16
-    ;stack_bottom:
-    ;    TIMES 16384 db
-    ;stack_top:
+    
 
 section .data
     
@@ -23,6 +25,7 @@ section .text
         ret
 
     _start:
+        lea rsp, [stack_top]
 
         ;mov rdx,CR0                            ; Start probe, get CR0
         ;and rdx, ~(1<<2)
