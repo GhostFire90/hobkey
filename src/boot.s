@@ -1,11 +1,13 @@
 section .bss
     global MAXPHYBIT
+    global MAXVRTBIT
     global stack_bottom
     align 16
     stack_bottom:
         resb 16384
     stack_top:
     MAXPHYBIT resb 1
+    MAXVRTBIT resb 1
     
 
 section .data
@@ -20,8 +22,12 @@ section .text
     get_phybit:
         mov eax, 0x80000008
         cpuid
+        mov ebx, eax
         and eax, 0xff
+        and ebx, 0xff00
+        shr ebx, 8
         mov [MAXPHYBIT], eax
+        mov [MAXVRTBIT], ebx
         ret
 
     _start:
