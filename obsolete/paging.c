@@ -9,6 +9,7 @@
 #define ELEVEN_MASK 0xFFFFFFFFFFFFF800
 
 extern const unsigned char MAXPHYBIT;
+extern const unsigned char MAXVRTBIT;
 
 extern uint64_t create_mask(uint64_t max_bit);
 void set_cr3(void* pml4){
@@ -27,7 +28,18 @@ extern void* _END_KERNEL;
 static uint64_t hhdm_offset;
 static uint64_t mask;
 static uint64_t* temp_map;
+static uint64_t* temp_location;
 
+uint64_t cannonize(uint64_t x, uint64_t n){
+    uint64_t sign_bit = 1ll << (n-1);
+
+    if(x & sign_bit){
+        return x | (~((1ll<<n)-1));
+    }
+    else{
+        return x | ((1ll<<n)-1);
+    }
+}
 
 void set_pointer(uint64_t* entry, uint64_t pointer, uint64_t flags){
     *entry |= (pointer&mask) | flags;
@@ -88,11 +100,12 @@ void get_indexes(uint64_t addr, uint16_t indexes[4], uint16_t* offset){
 }
 uint64_t from_indexes(uint16_t indexes[4], uint16_t offset){
     uint64_t ret = 0;
-    ret &= (indexes[0] << 39l) & 0x1ffl;
-    ret &= (indexes[1] << 30l) & 0x1ffl;
-    ret &= (indexes[2] << 21l) & 0x1ffl;
-    ret &= (indexes[3] >> 12l) & 0x1ffl;
+    ret |= ((uint64_t)indexes[0] << 39l);
+    ret |= ((uint64_t)indexes[1] << 30l);
+    ret |= ((uint64_t)indexes[2] << 21l);
+    ret |= ((uint64_t)indexes[3] >> 12l);
     ret += offset;
+    ret = cannonize(ret, MAXVRTBIT);
     return ret;
 }
 
@@ -108,6 +121,11 @@ void* sanity_check(uint64_t vaddr, uint64_t* pml4){
     return (void*)ret;
 
 }
+
+void map_to_temp(uint64_t phy_addr){
+
+}
+
 
 void initialize_paging()
 {
@@ -158,11 +176,20 @@ void initialize_paging()
     uint64_t test = (uint64_t)sanity_check(ka->virtual_base, PML4);
     printf("break me!");
 
-    kernel_indexes[3]+=1;
+    kernel_indexes[2]+=1;
     uint64_t* temp_table = ((uint64_t*)(get_pointer(kernel_pdt[kernel_indexes[2]])+hhdm_offset))+kernel_indexes[3];
-
-
+    temp_map = (uint64_t*)from_indexes(kernel_indexes, 0);
+    
+    kernel_indexes[2]+=1;
+    uint64_t* tmp_ptr = ((uint64_t*)(get_pointer(kernel_pdt[kernel_indexes[2]])+hhdm_offset))+kernel_indexes[3];
+    set_pointer(temp_table, ((uint64_t) tmp_ptr)-hhdm_offset, PAGING_RW | PAGING_PRESENT);
+    temp_location = (uint64_t*)from_indexes(kernel_indexes, 0);
 
 
     set_cr3(((char*)PML4)-hhdm_offset);
+
+    memset(temp_map, 0xff, 8);
+
+    asm volatile ("nop");
+
 }

@@ -62,7 +62,7 @@ LIMINE_SETUP:
 
 .PHONY: qemu
 qemu:
-	qemu-system-x86_64 -bios OVMF.fd -m $(MEMORY) -cdrom ${OUTDIR}/boot.iso -no-reboot -no-shutdown -D qemu_log.txt
+	qemu-system-x86_64 -bios OVMF.fd -m $(MEMORY) -cdrom ${OUTDIR}/boot.iso -no-reboot -no-shutdown -D qemu_log.txt -vga std
 
 .PHONY: qemu_gdb
 qemu_gdb:
