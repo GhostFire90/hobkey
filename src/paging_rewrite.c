@@ -36,7 +36,7 @@ uint64_t cannonize(uint64_t x, uint64_t n){
 }
 
 
-void set_cr3(void* pml4){
+void set_cr3(uint64_t pml4){
 
     asm volatile(
         "mov %0, %%cr3" 
@@ -47,6 +47,7 @@ void set_cr3(void* pml4){
 }
 
 void set_pointer(uint64_t* entry, uint64_t physical_address, uint64_t flags){
+    *entry &= ~phy_mask;
     *entry |= (physical_address&phy_mask) | flags;
 }
 uint64_t get_pointer(uint64_t entry){
@@ -80,9 +81,10 @@ void check_and_alloc(uint64_t* entry, uint64_t flags){
             char* page = get_page();
             
             allocate_page(page+hhdm_offset);
+            memset(page+hhdm_offset, 0, PAGE_SIZE);
 
             set_pointer(entry, (uint64_t)page, flags);
-            *entry = cannonize(*entry, MAXVRTBIT);
+            //*entry = cannonize(*entry, MAXVRTBIT);
 
         }
 
@@ -91,8 +93,6 @@ void check_and_alloc(uint64_t* entry, uint64_t flags){
 }
 
 
-/// Of note, i have not tested this implementation yet, i am mid rework 👍
-///
 /// @brief Crawls the current virtual map to find the layer specified by a given virtual address
 /// @param virtual_address the virtual address to use 
 /// @param layer Say you want whatever entry in the PML4 that the address references, give LAYER_PML4
@@ -115,7 +115,8 @@ uint64_t* map_crawl(uintptr_t virtual_address, map_layer_t layer){
     }
 }
 
-
+// See map_crawl for general breif
+// this function also calls "check_alloc "
 uint64_t* map_crawl_mark(uintptr_t virtual_address, map_layer_t layer, uint64_t flags){
     uint16_t indexes[4] = {0};
     get_indexes(virtual_address, indexes, 0);
@@ -129,7 +130,7 @@ uint64_t* map_crawl_mark(uintptr_t virtual_address, map_layer_t layer, uint64_t 
 
         for(int i = 0; i < layer; i++){
             uint64_t* current = &ret[indexes[i]];
-            if(flags & PAGING_PRESENT && !(*current & PAGING_PRESENT)){
+            if(flags & PAGING_PRESENT){
                 check_and_alloc(current, flags);
             }
             else{
@@ -153,31 +154,38 @@ uintptr_t from_indexes(uint16_t indexes[4], uint16_t offset){
     return ret;
 }
 
-
-
-
 // 
 void initialize_paging(){
+    // setup mask for ONLY the physical address, 11:M-1
     phy_mask = create_mask(MAXPHYBIT-1) ^ create_mask(11);
+    // cache limines hhdm offset for ease of use
     hhdm_offset = limine_hhdm()->offset;
+    // this bool should get switched to true after completing initial paging setup
     my_paging = false;    
 
+
+    // get a page from PMM and allocate it
     char* PML4 = (char*)get_page()+hhdm_offset;
     allocate_page(PML4);
     pml4_location = (uint64_t*)PML4;
+    // clear that bad boi
     memset(PML4, 0, PAGE_SIZE);
 
     const struct limine_kernel_address_response* ka = limine_kernel_addr();
 
+    // mapping the kernel correctly so the program counter doesnt get lost 😦
     uint64_t end_kernel = (uint64_t)&_END_KERNEL;
     uint64_t current = ka->virtual_base;
+    uint64_t current_phy = ka->physical_base;
 
     while(current < end_kernel){
         uint64_t* pte =  map_crawl_mark(current, LAYER_PT, PAGING_PRESENT | PAGING_RW);
-        set_pointer(pte, current-hhdm_offset, PAGING_PRESENT | PAGING_RW);
+        set_pointer(pte, current_phy, PAGING_PRESENT | PAGING_RW);
         current += PAGE_SIZE;
+        current_phy += PAGE_SIZE;
     }
 
-    set_cr3(PML4-hhdm_offset);    
+    // start those damn engines 😆
+    set_cr3((uint64_t)PML4-hhdm_offset);    
     
 }
