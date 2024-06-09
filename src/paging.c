@@ -20,6 +20,9 @@ static uint64_t phy_mask;
 static uint64_t hhdm_offset;
 static uint64_t* pml4_location;
 static bool my_paging;
+static uint64_t* temp_map_entry;
+static uint64_t* temp_map_memory;
+
 
 extern uint64_t create_mask(uint8_t max_bit);
 
@@ -148,10 +151,20 @@ uintptr_t from_indexes(uint16_t indexes[4], uint16_t offset){
     ret |= ((uint64_t)indexes[0] << 39l);
     ret |= ((uint64_t)indexes[1] << 30l);
     ret |= ((uint64_t)indexes[2] << 21l);
-    ret |= ((uint64_t)indexes[3] >> 12l);
+    ret |= ((uint64_t)indexes[3] << 12l);
     ret += offset;
     ret = cannonize(ret, MAXVRTBIT);
     return ret;
+}
+
+uint64_t* index_entry(uint64_t entry, uint16_t index){
+    if(my_paging){
+        return 0;
+    }
+    else{
+
+        return (uint64_t*)(get_pointer(entry)+hhdm_offset);
+    }
 }
 
 // 
@@ -185,7 +198,39 @@ void initialize_paging(){
         current_phy += PAGE_SIZE;
     }
 
+    // remap pml4 correctly
+    uint64_t* pml4_pte = map_crawl_mark((uint64_t)pml4_location, LAYER_PT, PAGING_PRESENT | PAGING_RW);
+    set_pointer(pml4_pte, (uint64_t)pml4_location-hhdm_offset, PAGING_PRESENT | PAGING_RW);
+
+    ///hooo boy this part is confusing T-T
+
+    //Use the page AFTER the kernel ends
+    uint16_t tmp_indexes[4] = {0};
+    get_indexes((uintptr_t)current+PAGE_SIZE, tmp_indexes, 0);
+    // the entry will be at the first pdt 
+    tmp_indexes[3] = 0;
+    tmp_indexes[2]++;
+    temp_map_entry = (uint64_t*)from_indexes(tmp_indexes, 0);
+    // the memory the entry references will be at the next pdt over
+    tmp_indexes[2]++;
+    temp_map_memory = (uint64_t*)from_indexes(tmp_indexes, 0);
+
+    // initialize the memory location all the way down
+    map_crawl_mark((uintptr_t)temp_map_memory, LAYER_PT, PAGING_PRESENT | PAGING_RW);
+    // get the pdt we just set up
+    uint64_t* temp_map_pdt = map_crawl((uintptr_t)temp_map_memory, LAYER_PDT);
+
+    // get the entries spot initialzed
+    uint64_t* temp_map_entry_pte = map_crawl_mark((uintptr_t)temp_map_entry, LAYER_PT, PAGING_PRESENT | PAGING_RW);
+    // set that mofo
+    set_pointer(temp_map_entry_pte, get_pointer(*temp_map_pdt), PAGING_RW | PAGING_PRESENT);
+
+    // 🙏
+
     // start those damn engines 😆
     set_cr3((uint64_t)PML4-hhdm_offset);    
+    memset(temp_map_entry, 0xFF, 8);
+
+    asm volatile("nop");
     
 }
