@@ -17,5 +17,11 @@
 
 
 void initialize_paging();
+void* map_to_temp(void* addr);
+unsigned long long get_temp();
+void unmap_temp();
+void map_phy_to_vrt(void* virtual, void* physical, unsigned long long flags);
+
+
 
 #endif
