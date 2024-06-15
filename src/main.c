@@ -11,17 +11,10 @@
 #include <limine.h>
 #include "PMM.h"
 #include "paging.h"
+#include "limine_requests.h"
 LIMINE_BASE_REVISION(1)
 
-static struct limine_framebuffer_request frame_buffer_req = {
-    .id = LIMINE_FRAMEBUFFER_REQUEST,
-    .revision = 0
-};
 
-static struct limine_module_request initrd_req = {
-    .id = LIMINE_MODULE_REQUEST,
-    .revision = 0
-};
 
 
 
@@ -32,13 +25,10 @@ const char* message = "Hello";
 
 
 int32_t kernel_main(void){
-    InitializeRamdisc(initrd_req.response->modules[0]->address, initrd_req.response->modules[0]->size);
+    InitializeRamdisc(limine_modules()->modules[0]->address, limine_modules()->modules[0]->size);
     //memset(bp->frameBuffer, 0x00, (bp->resX*4)*(bp->resY*4));
 
-    struct limine_framebuffer *fb = frame_buffer_req.response->framebuffers[0];
-    psf_t font;
-    GetPsf(&font, "resources/zap-vga.psf");
-    
+    struct limine_framebuffer *fb = limine_framebuffer()->framebuffers[0];
     
 
     InitializeTerminal(fb);

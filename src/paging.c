@@ -50,15 +50,17 @@ void set_cr3(uint64_t pml4){
 }
 
 void set_pointer(uint64_t* entry, uint64_t physical_address, uint64_t flags){
-    *entry &= ~phy_mask;
-    *entry |= (physical_address&phy_mask) | flags;
+    //*entry &= ~phy_mask;
+    *entry = (physical_address&phy_mask) | flags;
 }
 uint64_t get_pointer(uint64_t entry){
     return entry&phy_mask;
 }
 void set_flags(uint64_t* entry, uint64_t flags){
-    *entry &= phy_mask;
-    *entry |= flags;
+    uint64_t e = *entry;
+    e &= phy_mask;
+    e |= flags;
+    *entry = e;
 }
 
 void get_indexes(uintptr_t addr, uint16_t indexes[4], uint16_t* offset){
@@ -77,22 +79,29 @@ void check_and_alloc(uint64_t* entry, uint64_t flags){
     bool present = (*entry) & PAGING_PRESENT;
     if(!present){
 
+        char* page = get_page();
+        
         if(my_paging){
-            
+            uint64_t old = get_temp();
+            uint64_t* vadder = map_to_temp(page);
+            allocate_page(vadder);
+            memset(vadder, 0, PAGE_SIZE);
+            map_to_temp((void*)old);
         }
         else{
-            char* page = get_page();
-            
             allocate_page(page+hhdm_offset);
             memset(page+hhdm_offset, 0, PAGE_SIZE);
-
-            set_pointer(entry, (uint64_t)page, flags);
-            //*entry = cannonize(*entry, MAXVRTBIT);
-
+            
         }
+        //void* vadder = my_paging ? map_to_temp(page) : page+hhdm_offset;
 
+
+        set_pointer(entry, (uint64_t)page, flags);
+        //*entry = cannonize(*entry, MAXVRTBIT);
     }
-
+    else{
+        set_flags(entry, flags);
+    }
 }
 
 
@@ -104,18 +113,15 @@ uint64_t* map_crawl(uintptr_t virtual_address, map_layer_t layer){
     uint16_t indexes[4] = {0};
     get_indexes(virtual_address, indexes, 0);
     
-    if(my_paging){
-        // do temp map stuff to get the end result!
-        return 0;
-    }
-    else{
-        uint64_t* ret = pml4_location;
+    
+    uint64_t* ret = pml4_location;
 
-        for(int i = 0; i < layer; i++){
-            ret = (uint64_t*)(get_pointer(ret[indexes[i]])+hhdm_offset);
-        }
-        return &ret[indexes[layer]];
+    for(int i = 0; i < layer; i++){
+        uint64_t phy = get_pointer(ret[indexes[i]]);
+        ret = (uint64_t*)(my_paging ? (uint64_t)map_to_temp((void*)phy) : phy + hhdm_offset);
     }
+    return &ret[indexes[layer]];
+
 }
 
 // See map_crawl for general breif
@@ -124,25 +130,22 @@ uint64_t* map_crawl_mark(uintptr_t virtual_address, map_layer_t layer, uint64_t 
     uint16_t indexes[4] = {0};
     get_indexes(virtual_address, indexes, 0);
     
-    if(my_paging){
-        // do temp map stuff to get the end result!
-        return 0;
-    }
-    else{
-        uint64_t* ret = pml4_location;
 
-        for(int i = 0; i < layer; i++){
-            uint64_t* current = &ret[indexes[i]];
-            if(flags & PAGING_PRESENT){
-                check_and_alloc(current, flags);
-            }
-            else{
-                set_flags(current, flags);
-            }
-            ret = (uint64_t*)(get_pointer(*current)+hhdm_offset);
+    uint64_t* ret = pml4_location;
+
+    for(int i = 0; i < layer; i++){
+        uint64_t* current = &ret[indexes[i]];
+        if(flags & PAGING_PRESENT){
+            check_and_alloc(current, flags);
         }
-        return &ret[indexes[layer]];
+        else{
+            set_flags(current, flags);
+        }
+        uint64_t phy = get_pointer(*current);
+        ret = (uint64_t*)( my_paging ? (uint64_t)map_to_temp((void*)phy) : phy+hhdm_offset);
     }
+    return &ret[indexes[layer]];
+    
 }
 
 
@@ -157,6 +160,7 @@ uintptr_t from_indexes(uint16_t indexes[4], uint16_t offset){
     return ret;
 }
 
+//UNUSED
 uint64_t* index_entry(uint64_t entry, uint16_t index){
     if(my_paging){
         return 0;
@@ -206,13 +210,14 @@ void initialize_paging(){
 
     //Use the page AFTER the kernel ends
     uint16_t tmp_indexes[4] = {0};
-    get_indexes((uintptr_t)current+PAGE_SIZE, tmp_indexes, 0);
+    get_indexes((uintptr_t)current, tmp_indexes, 0);
     // the entry will be at the first pdt 
     tmp_indexes[3] = 0;
     tmp_indexes[2]++;
     temp_map_entry = (uint64_t*)from_indexes(tmp_indexes, 0);
     // the memory the entry references will be at the next pdt over
-    tmp_indexes[2]++;
+    tmp_indexes[1]++;
+    tmp_indexes[2] = 0;
     temp_map_memory = (uint64_t*)from_indexes(tmp_indexes, 0);
 
     // initialize the memory location all the way down
@@ -228,9 +233,52 @@ void initialize_paging(){
     // 🙏
 
     // start those damn engines 😆
-    set_cr3((uint64_t)PML4-hhdm_offset);    
-    memset(temp_map_entry, 0xFF, 8);
+
+    tmp_indexes[2]++;
+
+    uint64_t fb_vrt = from_indexes(tmp_indexes, 0);
+    const struct limine_framebuffer_response* fb = limine_framebuffer();
+    uint64_t fb_phy = (uint64_t)fb->framebuffers[0]->address - hhdm_offset;
+    uint64_t fb_size = fb->framebuffers[0]->width * fb->framebuffers[0]->height;
+    uint64_t fb_pages = fb_size / PAGE_SIZE + (fb_size % PAGE_SIZE != 0 ? 1 : 0); 
+
+    set_cr3((uint64_t)PML4-hhdm_offset);
+    my_paging = true;
+    
+    for(uint64_t i = 0; i < fb_pages; i++){
+        map_phy_to_vrt((void*)fb_vrt, (void*)fb_phy, PAGING_PRESENT | PAGING_RW);
+        fb_phy += PAGE_SIZE;
+        fb_vrt += PAGE_SIZE;
+    }
+    fb_vrt -= PAGE_SIZE * fb_pages;
+
+    memset((void*)fb_vrt, 0xFF, PAGE_SIZE);
+
 
     asm volatile("nop");
     
+}
+
+void *map_to_temp(void *addr)
+{
+    set_pointer(temp_map_entry, (uint64_t)addr, PAGING_PRESENT | PAGING_RW);
+    return temp_map_memory;
+}
+
+unsigned long long get_temp()
+{
+    return get_pointer(*temp_map_entry);
+}
+
+void unmap_temp()
+{
+    set_pointer(temp_map_entry, 0, 0);
+}
+
+void map_phy_to_vrt(void *virtual, void *physical, unsigned long long flags)
+{
+    uint64_t* location = map_crawl_mark((uintptr_t) virtual, LAYER_PT, flags);
+    set_pointer(location, (uint64_t) physical, flags);
+    unmap_temp();
+    //set_cr3((uint64_t)pml4_location);
 }
