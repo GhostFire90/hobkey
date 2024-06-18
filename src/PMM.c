@@ -3,6 +3,7 @@
 #include <limine.h>
 #include "terminal.h"
 #include "limine_requests.h"
+#include "paging.h"
 
 #define PAGE_SIZE 4096
 
@@ -63,8 +64,23 @@ void allocate_page(void* vaddr){
     free_pages--;
 }
 
+// OF NOTE, THIS DOES NOT UNMAP IT, JUST PUSHES IT ONTO THE STACK, YOU HAVE BEEN WARNED 👿
 void free_page(void* page)
 {
+    
     freepage_t* fp = (freepage_t*)page;
+    if(CustomPagingEnabled()){
+        uint64_t physical = get_pointer(*map_crawl((uint64_t)page, LAYER_PT));
+        
+        fp->previous = top;
+        top = (freepage_t*)physical;
+    }
+    else{
+        uint64_t offset = limine_hhdm()->offset;
+
+        fp->previous = top;
+        top = (freepage_t*)((char*)page - offset);
+    }
+    
     //fp->previous
 }

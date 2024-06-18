@@ -8,9 +8,6 @@
 #define PAGE_SIZE 4096
 
 
-typedef enum {LAYER_PML4, LAYER_PDPT, LAYER_PDT, LAYER_PT} map_layer_t;
-
-
 
 extern const unsigned char MAXPHYBIT;
 extern const unsigned char MAXVRTBIT;
@@ -198,8 +195,8 @@ void initialize_paging(){
     // clear that bad boi
     memset(PML4, 0, PAGE_SIZE);
 
-    const struct limine_kernel_address_response* ka = limine_kernel_addr();
 
+    // remap limines stack
     uint64_t current = STACK_ADDRESS;
     while(STACK_ADDRESS-current != 0x10000){
         uint64_t* pte = map_crawl_mark((uintptr_t)current, LAYER_PT, PAGING_PRESENT | PAGING_RW);
@@ -208,6 +205,7 @@ void initialize_paging(){
     }
 
     // mapping the kernel correctly so the program counter doesnt get lost 😦
+    const struct limine_kernel_address_response* ka = limine_kernel_addr();
     uint64_t end_kernel = (uint64_t)&_END_KERNEL;
     current = ka->virtual_base;
     uint64_t current_phy = ka->physical_base;
@@ -225,15 +223,11 @@ void initialize_paging(){
 
     ///hooo boy this part is confusing T-T
 
-    //Use the pdt AFTER the kernel ends
-    uint16_t tmp_indexes[4] = {511, 511, 510, 0};
-    //get_indexes((uintptr_t)current, tmp_indexes, 0);
-    // the entry will be at the first pdt 
-    //tmp_indexes[3] = 0;
-    //tmp_indexes[2]++;
+    // Some arbitrarily FAR address in the heigher half, last 3 pdt's used
+    uint16_t tmp_indexes[4] = {511, 511, 509, 0};
+    
     temp_map_entry = (uint64_t*)from_indexes(tmp_indexes, 0);
-    // the memory the entry references will be at the next pdpt over
-    //tmp_indexes[1]++;
+   
     tmp_indexes[2]++;
     temp_map_memory = (uint64_t*)from_indexes(tmp_indexes, 0);
 
@@ -249,19 +243,23 @@ void initialize_paging(){
 
     // 🙏
 
-    // start those damn engines 😆
+    
 
+    // framebuffer reloacated to the last of those 3 pdts
     tmp_indexes[2]++;
 
     uint64_t fb_vrt = from_indexes(tmp_indexes, 0);
     const struct limine_framebuffer_response* fb = limine_framebuffer();
     uint64_t fb_phy = (uint64_t)fb->framebuffers[0]->address - hhdm_offset;
+    // 4 bytes per pixel
     uint64_t fb_size = fb->framebuffers[0]->width * fb->framebuffers[0]->height * 4;
     uint64_t fb_pages = fb_size / PAGE_SIZE + (fb_size % PAGE_SIZE != 0 ? 1 : 0); 
 
     set_cr3((uint64_t)PML4-hhdm_offset);
+    // make sure the flag is set so we dont like, explode by using old paging
     my_paging = true;
     
+    // easier mapping! 
     for(uint64_t i = 0; i < fb_pages; i++){
         map_phy_to_vrt((void*)fb_vrt, (void*)fb_phy, PAGING_PRESENT | PAGING_RW);
         fb_phy += PAGE_SIZE;
@@ -269,6 +267,7 @@ void initialize_paging(){
     }
     fb_vrt -= PAGE_SIZE * fb_pages;
 
+    //testing the color setting
     memset((void*)fb_vrt, 0xFF, fb_pages*PAGE_SIZE);
 
 
@@ -301,4 +300,9 @@ void map_phy_to_vrt(void *virtual, void *physical, unsigned long long flags)
     invalidate_page((uint64_t)virtual);
     unmap_temp();
     //set_cr3((uint64_t)pml4_location);
+}
+
+bool CustomPagingEnabled(void)
+{
+    return my_paging;
 }
