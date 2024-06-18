@@ -30,6 +30,12 @@ static volatile struct limine_module_request initrd_req = {
     .revision = 0
 };
 
+static volatile struct limine_stack_size_request stack_size ={
+    .id = LIMINE_STACK_SIZE_REQUEST,
+    .revision = 0,
+    .stack_size = 0x10000
+};
+
 const struct limine_memmap_response *limine_memmap()
 {
     return memmap_req.response;

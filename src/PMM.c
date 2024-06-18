@@ -8,7 +8,7 @@
 
 
 typedef struct _free_page{
-    void* previous;
+    struct _free_page* previous;
 } freepage_t;
 
 
@@ -16,7 +16,7 @@ typedef struct _free_page{
 static freepage_t* top = 0;
 static int free_pages = 0;
 
-void* list_from_block(const struct limine_memmap_entry* entry, void* prev){
+freepage_t* list_from_block(const struct limine_memmap_entry* entry, freepage_t* prev){
     //uint64_t page_count = entry.length/PAGE_SIZE;
 
     uint64_t offset = limine_hhdm()->offset;
@@ -25,7 +25,7 @@ void* list_from_block(const struct limine_memmap_entry* entry, void* prev){
     for(uint64_t current = base; current < end; current += PAGE_SIZE){
         freepage_t* pg = (freepage_t*)(current+offset);
         pg->previous = prev;
-        prev = (void*)current;
+        prev = (freepage_t*)current;
         free_pages++;
         
     }
@@ -38,7 +38,7 @@ int page_count(void){
 void build_list()
 {
     const struct limine_memmap_response* memmap = limine_memmap();
-    void* current = 0;
+    freepage_t* current = 0;
     for(uint64_t i = 0; i < memmap->entry_count; i++){
         struct limine_memmap_entry* entry = memmap->entries[i];
         if(entry->type == LIMINE_MEMMAP_USABLE){
@@ -46,7 +46,7 @@ void build_list()
 
         }
     }
-    top = (freepage_t*)current;
+    top = current;
     printf("Prepared %d pages\n", free_pages);
 }
 
@@ -59,6 +59,7 @@ void allocate_page(void* vaddr){
     
     freepage_t* fp = (freepage_t*)vaddr;
     top = fp->previous;
+    //fp->previous = 0;
     free_pages--;
 }
 
