@@ -1,13 +1,15 @@
 section .bss
     global MAXPHYBIT
     global MAXVRTBIT
-    global stack_bottom
-    align 16
-    stack_bottom:
-        resb 16384
-    stack_top:
+    global STACK_ADDRESS
+    ;global stack_bottom
+    ;align 16
+    ;stack_bottom:
+    ;    resb 65536
+    ;stack_top:
     MAXPHYBIT resb 1
     MAXVRTBIT resb 1
+    STACK_ADDRESS resb 8
     
 
 section .data
@@ -26,12 +28,13 @@ section .text
         and eax, 0xff
         and ebx, 0xff00
         shr ebx, 8
-        mov [MAXPHYBIT], eax
-        mov [MAXVRTBIT], ebx
+        mov byte [MAXPHYBIT], AL
+        mov byte [MAXVRTBIT], BL
         ret
 
     _start:
-        lea rsp, [stack_top]
+        pop rax
+        mov [STACK_ADDRESS], rsp
 
         ;mov rdx,CR0                            ; Start probe, get CR0
         ;and rdx, ~(1<<2)

@@ -30,14 +30,15 @@ $(BUILDDIR)%.s.o: $(SRCDIR)/%.s
 	@nasm -felf64 -Fdwarf -g $< -o $@
 $(BUILDDIR)%.c.o: $(SRCDIR)/%.c
 	@echo [Compiling] $< -> $@
-	@clang -target x86_64-elf -g -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
+	@clang -target x86_64-elf -g -O0 -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
 	
 casm:
 	i686-elf-gcc -S ${CSRC}
 .PHONY: preLD
 preLD:
 LD:
-	clang -T linker.ld -no-pie -o ${OUTDIR}/kernel.bin -ffreestanding -nostdlib ${wildcard ${BUILDDIR}/*.o}
+	@echo [Linking] kernel.bin
+	@clang -T linker.ld -no-pie -o ${OUTDIR}/kernel.bin -ffreestanding -nostdlib ${wildcard ${BUILDDIR}/*.o}
 
 
 

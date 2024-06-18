@@ -14,6 +14,7 @@ typedef enum {LAYER_PML4, LAYER_PDPT, LAYER_PDT, LAYER_PT} map_layer_t;
 
 extern const unsigned char MAXPHYBIT;
 extern const unsigned char MAXVRTBIT;
+extern const uint64_t STACK_ADDRESS;
 extern void* _END_KERNEL;
 
 static uint64_t phy_mask;
@@ -47,6 +48,14 @@ void set_cr3(uint64_t pml4){
         :"r"(pml4)
     );
 
+}
+
+void invalidate_page(uint64_t vadder){
+    asm volatile(
+        "invlpg (%0)"
+        :
+        :"r"(vadder) : "memory"
+    );
 }
 
 void set_pointer(uint64_t* entry, uint64_t physical_address, uint64_t flags){
@@ -85,6 +94,7 @@ void check_and_alloc(uint64_t* entry, uint64_t flags){
             uint64_t old = get_temp();
             uint64_t* vadder = map_to_temp(page);
             allocate_page(vadder);
+            //*vadder = 0xdeadbeef;
             memset(vadder, 0, PAGE_SIZE);
             map_to_temp((void*)old);
         }
@@ -190,9 +200,16 @@ void initialize_paging(){
 
     const struct limine_kernel_address_response* ka = limine_kernel_addr();
 
+    uint64_t current = STACK_ADDRESS;
+    while(STACK_ADDRESS-current != 0x10000){
+        uint64_t* pte = map_crawl_mark((uintptr_t)current, LAYER_PT, PAGING_PRESENT | PAGING_RW);
+        set_pointer(pte, current-hhdm_offset, PAGING_RW | PAGING_PRESENT);
+        current-=PAGE_SIZE;
+    }
+
     // mapping the kernel correctly so the program counter doesnt get lost 😦
     uint64_t end_kernel = (uint64_t)&_END_KERNEL;
-    uint64_t current = ka->virtual_base;
+    current = ka->virtual_base;
     uint64_t current_phy = ka->physical_base;
 
     while(current < end_kernel){
@@ -208,20 +225,20 @@ void initialize_paging(){
 
     ///hooo boy this part is confusing T-T
 
-    //Use the page AFTER the kernel ends
-    uint16_t tmp_indexes[4] = {0};
-    get_indexes((uintptr_t)current, tmp_indexes, 0);
+    //Use the pdt AFTER the kernel ends
+    uint16_t tmp_indexes[4] = {511, 511, 510, 0};
+    //get_indexes((uintptr_t)current, tmp_indexes, 0);
     // the entry will be at the first pdt 
-    tmp_indexes[3] = 0;
-    tmp_indexes[2]++;
+    //tmp_indexes[3] = 0;
+    //tmp_indexes[2]++;
     temp_map_entry = (uint64_t*)from_indexes(tmp_indexes, 0);
-    // the memory the entry references will be at the next pdt over
-    tmp_indexes[1]++;
-    tmp_indexes[2] = 0;
+    // the memory the entry references will be at the next pdpt over
+    //tmp_indexes[1]++;
+    tmp_indexes[2]++;
     temp_map_memory = (uint64_t*)from_indexes(tmp_indexes, 0);
 
     // initialize the memory location all the way down
-    map_crawl_mark((uintptr_t)temp_map_memory, LAYER_PT, PAGING_PRESENT | PAGING_RW);
+    uint64_t* temp_map_pte = map_crawl_mark((uintptr_t)temp_map_memory, LAYER_PT, PAGING_PRESENT | PAGING_RW);
     // get the pdt we just set up
     uint64_t* temp_map_pdt = map_crawl((uintptr_t)temp_map_memory, LAYER_PDT);
 
@@ -239,7 +256,7 @@ void initialize_paging(){
     uint64_t fb_vrt = from_indexes(tmp_indexes, 0);
     const struct limine_framebuffer_response* fb = limine_framebuffer();
     uint64_t fb_phy = (uint64_t)fb->framebuffers[0]->address - hhdm_offset;
-    uint64_t fb_size = fb->framebuffers[0]->width * fb->framebuffers[0]->height;
+    uint64_t fb_size = fb->framebuffers[0]->width * fb->framebuffers[0]->height * 4;
     uint64_t fb_pages = fb_size / PAGE_SIZE + (fb_size % PAGE_SIZE != 0 ? 1 : 0); 
 
     set_cr3((uint64_t)PML4-hhdm_offset);
@@ -252,7 +269,7 @@ void initialize_paging(){
     }
     fb_vrt -= PAGE_SIZE * fb_pages;
 
-    memset((void*)fb_vrt, 0xFF, PAGE_SIZE);
+    memset((void*)fb_vrt, 0xFF, fb_pages*PAGE_SIZE);
 
 
     asm volatile("nop");
@@ -262,6 +279,7 @@ void initialize_paging(){
 void *map_to_temp(void *addr)
 {
     set_pointer(temp_map_entry, (uint64_t)addr, PAGING_PRESENT | PAGING_RW);
+    invalidate_page((uint64_t)temp_map_memory);
     return temp_map_memory;
 }
 
@@ -273,12 +291,14 @@ unsigned long long get_temp()
 void unmap_temp()
 {
     set_pointer(temp_map_entry, 0, 0);
+    invalidate_page((uint64_t)temp_map_memory);
 }
 
 void map_phy_to_vrt(void *virtual, void *physical, unsigned long long flags)
 {
     uint64_t* location = map_crawl_mark((uintptr_t) virtual, LAYER_PT, flags);
     set_pointer(location, (uint64_t) physical, flags);
+    invalidate_page((uint64_t)virtual);
     unmap_temp();
     //set_cr3((uint64_t)pml4_location);
 }
