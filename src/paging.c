@@ -20,7 +20,7 @@ static uint64_t* pml4_location;
 static bool my_paging;
 static uint64_t* temp_map_entry;
 static uint64_t* temp_map_memory;
-static uint64_t temp_map_index;
+//static uint64_t temp_map_index;
 
 
 extern uint64_t create_mask(uint8_t max_bit);
@@ -246,7 +246,7 @@ void initialize_paging(){
     uint64_t* temp_map_entry_pte = map_crawl_mark((uintptr_t)temp_map_entry, LAYER_PT, PAGING_PRESENT | PAGING_RW);
     // set that mofo
     set_pointer(temp_map_entry_pte, get_pointer(*temp_map_pdt), PAGING_RW | PAGING_PRESENT);
-    temp_map_index = tmp_indexes[3];
+    temp_map_entry += tmp_indexes[3];
 
     // 🙏
 
@@ -284,19 +284,19 @@ void initialize_paging(){
 
 void *map_to_temp(void *addr)
 {
-    set_pointer(temp_map_entry+temp_map_index, (uint64_t)addr, PAGING_PRESENT | PAGING_RW);
+    set_pointer(temp_map_entry, (uint64_t)addr, PAGING_PRESENT | PAGING_RW);
     invalidate_page((uint64_t)temp_map_memory);
     return temp_map_memory;
 }
 
 unsigned long long get_temp()
 {
-    return get_pointer(temp_map_entry[temp_map_index]);
+    return get_pointer(*temp_map_entry);
 }
 
 void unmap_temp()
 {
-    set_pointer(temp_map_entry+temp_map_index, 0, 0);
+    set_pointer(temp_map_entry, 0, 0);
     invalidate_page((uint64_t)temp_map_memory);
 }
 
