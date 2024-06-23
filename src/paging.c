@@ -20,6 +20,7 @@ static uint64_t* pml4_location;
 static bool my_paging;
 static uint64_t* temp_map_entry;
 static uint64_t* temp_map_memory;
+static uint64_t temp_map_index;
 
 
 extern uint64_t create_mask(uint8_t max_bit);
@@ -224,15 +225,20 @@ void initialize_paging(){
     ///hooo boy this part is confusing T-T
 
     // Some arbitrarily FAR address in the heigher half, last 3 pdt's used
-    uint16_t tmp_indexes[4] = {511, 511, 509, 0};
+    uint16_t tmp_indexes[4] = {0};
+
+    get_indexes(current, tmp_indexes, 0);
+    tmp_indexes[3]++;
     
     temp_map_entry = (uint64_t*)from_indexes(tmp_indexes, 0);
+    tmp_indexes[3]++;
    
-    tmp_indexes[2]++;
+    //tmp_indexes[2]++;
     temp_map_memory = (uint64_t*)from_indexes(tmp_indexes, 0);
 
     // initialize the memory location all the way down
     uint64_t* temp_map_pte = map_crawl_mark((uintptr_t)temp_map_memory, LAYER_PT, PAGING_PRESENT | PAGING_RW);
+    set_pointer(temp_map_pte, 0, 0);
     // get the pdt we just set up
     uint64_t* temp_map_pdt = map_crawl((uintptr_t)temp_map_memory, LAYER_PDT);
 
@@ -240,6 +246,7 @@ void initialize_paging(){
     uint64_t* temp_map_entry_pte = map_crawl_mark((uintptr_t)temp_map_entry, LAYER_PT, PAGING_PRESENT | PAGING_RW);
     // set that mofo
     set_pointer(temp_map_entry_pte, get_pointer(*temp_map_pdt), PAGING_RW | PAGING_PRESENT);
+    temp_map_index = tmp_indexes[3];
 
     // 🙏
 
@@ -277,19 +284,19 @@ void initialize_paging(){
 
 void *map_to_temp(void *addr)
 {
-    set_pointer(temp_map_entry, (uint64_t)addr, PAGING_PRESENT | PAGING_RW);
+    set_pointer(temp_map_entry+temp_map_index, (uint64_t)addr, PAGING_PRESENT | PAGING_RW);
     invalidate_page((uint64_t)temp_map_memory);
     return temp_map_memory;
 }
 
 unsigned long long get_temp()
 {
-    return get_pointer(*temp_map_entry);
+    return get_pointer(temp_map_entry[temp_map_index]);
 }
 
 void unmap_temp()
 {
-    set_pointer(temp_map_entry, 0, 0);
+    set_pointer(temp_map_entry+temp_map_index, 0, 0);
     invalidate_page((uint64_t)temp_map_memory);
 }
 
