@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define PAGE_SIZE 4096
+
 #define PAGING_PRESENT        (1 << 0)  // Present; must be 1 to reference a paging table
 #define PAGING_RW             (1 << 1)  // Read/write; if 0, writes may not be allowed (see Section 4.6)
 #define PAGING_USER           (1 << 2)  // User/supervisor; if 0, user-mode accesses are not allowed (see Section 4.6)
@@ -18,7 +20,7 @@ typedef enum {LAYER_PML4, LAYER_PDPT, LAYER_PDT, LAYER_PT} map_layer_t;
 
 
 
-void initialize_paging();
+unsigned long long initialize_paging();
 void* map_to_temp(void* addr);
 unsigned long long get_temp();
 void unmap_temp();

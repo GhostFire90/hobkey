@@ -48,13 +48,7 @@ void set_cr3(uint64_t pml4){
 
 }
 
-void invalidate_page(uint64_t vadder){
-    asm volatile(
-        "invlpg (%0)"
-        :
-        :"r"(vadder) : "memory"
-    );
-}
+extern void invalidate_page(uint64_t vadder);
 
 void set_pointer(uint64_t* entry, uint64_t physical_address, uint64_t flags){
     //*entry &= ~phy_mask;
@@ -180,7 +174,7 @@ uint64_t* index_entry(uint64_t entry, uint16_t index){
 }
 
 // 
-void initialize_paging(){
+unsigned long long initialize_paging(){
     // setup mask for ONLY the physical address, 11:M-1
     phy_mask = create_mask(MAXPHYBIT-1) ^ create_mask(11);
     // cache limines hhdm offset for ease of use
@@ -247,38 +241,40 @@ void initialize_paging(){
     // set that mofo
     set_pointer(temp_map_entry_pte, get_pointer(*temp_map_pdt), PAGING_RW | PAGING_PRESENT);
     temp_map_entry += tmp_indexes[3];
+    tmp_indexes[3]++;
 
     // 🙏
 
     
 
-    // framebuffer reloacated to the last of those 3 pdts
-    tmp_indexes[2]++;
+    // // framebuffer reloacated to the last of those 3 pdts
+    // tmp_indexes[2]++;
 
-    uint64_t fb_vrt = from_indexes(tmp_indexes, 0);
-    const struct limine_framebuffer_response* fb = limine_framebuffer();
-    uint64_t fb_phy = (uint64_t)fb->framebuffers[0]->address - hhdm_offset;
-    // 4 bytes per pixel
-    uint64_t fb_size = fb->framebuffers[0]->width * fb->framebuffers[0]->height * 4;
-    uint64_t fb_pages = fb_size / PAGE_SIZE + (fb_size % PAGE_SIZE != 0 ? 1 : 0); 
+    // uint64_t fb_vrt = from_indexes(tmp_indexes, 0);
+    // const struct limine_framebuffer_response* fb = limine_framebuffer();
+    // uint64_t fb_phy = (uint64_t)fb->framebuffers[0]->address - hhdm_offset;
+    // // 4 bytes per pixel
+    // uint64_t fb_size = fb->framebuffers[0]->width * fb->framebuffers[0]->height * 4;
+    // uint64_t fb_pages = fb_size / PAGE_SIZE + (fb_size % PAGE_SIZE != 0 ? 1 : 0); 
 
     set_cr3((uint64_t)PML4-hhdm_offset);
-    // make sure the flag is set so we dont like, explode by using old paging
+    // // make sure the flag is set so we dont like, explode by using old paging
     my_paging = true;
+    return from_indexes(tmp_indexes, 0);
     
-    // easier mapping! 
-    for(uint64_t i = 0; i < fb_pages; i++){
-        map_phy_to_vrt((void*)fb_vrt, (void*)fb_phy, PAGING_PRESENT | PAGING_RW);
-        fb_phy += PAGE_SIZE;
-        fb_vrt += PAGE_SIZE;
-    }
-    fb_vrt -= PAGE_SIZE * fb_pages;
+    // // easier mapping! 
+    // for(uint64_t i = 0; i < fb_pages; i++){
+    //     map_phy_to_vrt((void*)fb_vrt, (void*)fb_phy, PAGING_PRESENT | PAGING_RW);
+    //     fb_phy += PAGE_SIZE;
+    //     fb_vrt += PAGE_SIZE;
+    // }
+    // fb_vrt -= PAGE_SIZE * fb_pages;
 
-    //testing the color setting
-    memset((void*)fb_vrt, 0xFF, fb_pages*PAGE_SIZE);
+    // //testing the color setting
+    // memset((void*)fb_vrt, 0xFF, fb_pages*PAGE_SIZE);
 
 
-    asm volatile("nop");
+    // asm volatile("nop");
     
 }
 

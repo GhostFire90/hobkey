@@ -48,7 +48,7 @@ void build_list()
         }
     }
     top = current;
-    printf("Prepared %d pages\n", free_pages);
+    //printf("Prepared %d pages\n", free_pages);
 }
 
 void *get_page()
