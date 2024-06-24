@@ -59,14 +59,9 @@ int32_t kernel_main(void){
         initrd_phy+= PAGE_SIZE;
     }
 
-
-
     InitializeRamdisc((char*)initrd_begin, initrd.size);
     InitializeTerminal(&fb);
-    printf("Paging remap complete");
-
-
-    
+    printf("Paging remap complete");    
 
     while(1){}
     return 0;
