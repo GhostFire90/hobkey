@@ -48,7 +48,7 @@ void set_cr3(uint64_t pml4){
 
 }
 
-extern void invalidate_page(uint64_t vadder);
+extern void invalidate_page(uint64_t* vadder);
 
 void set_pointer(uint64_t* entry, uint64_t physical_address, uint64_t flags){
     //*entry &= ~phy_mask;
@@ -74,6 +74,23 @@ void get_indexes(uintptr_t addr, uint16_t indexes[4], uint16_t* offset){
 
 }
 
+void *map_to_temp(void *addr)
+{
+    set_pointer(temp_map_entry, (uint64_t)addr, PAGING_PRESENT | PAGING_RW);
+    invalidate_page(temp_map_memory);
+    return temp_map_memory;
+}
+
+unsigned long long get_temp()
+{
+    return get_pointer(*temp_map_entry);
+}
+
+void unmap_temp()
+{
+    set_pointer(temp_map_entry, 0, 0);
+    invalidate_page(temp_map_memory);
+}
 
 void check_and_alloc(uint64_t* entry, uint64_t flags){
 
@@ -278,32 +295,9 @@ unsigned long long initialize_paging(){
     
 }
 
-void *map_to_temp(void *addr)
-{
-    set_pointer(temp_map_entry, (uint64_t)addr, PAGING_PRESENT | PAGING_RW);
-    invalidate_page((uint64_t)temp_map_memory);
-    return temp_map_memory;
-}
 
-unsigned long long get_temp()
-{
-    return get_pointer(*temp_map_entry);
-}
 
-void unmap_temp()
-{
-    set_pointer(temp_map_entry, 0, 0);
-    invalidate_page((uint64_t)temp_map_memory);
-}
 
-void map_phy_to_vrt(void *virtual, void *physical, unsigned long long flags)
-{
-    uint64_t* location = map_crawl_mark((uintptr_t) virtual, LAYER_PT, flags);
-    set_pointer(location, (uint64_t) physical, flags);
-    invalidate_page((uint64_t)virtual);
-    unmap_temp();
-    //set_cr3((uint64_t)pml4_location);
-}
 
 bool CustomPagingEnabled(void)
 {
