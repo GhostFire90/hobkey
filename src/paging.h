@@ -21,14 +21,14 @@ typedef enum {LAYER_PML4, LAYER_PDPT, LAYER_PDT, LAYER_PT} map_layer_t;
 
 
 unsigned long long initialize_paging();
-void* map_to_temp(void* addr);
-unsigned long long get_temp();
+//void* map_to_temp(void* addr);
+//unsigned long long get_temp();
 void unmap_temp();
-void map_phy_to_vrt(void* virtual, void* physical, unsigned long long flags);
 bool CustomPagingEnabled(void);
 uint64_t get_pointer(uint64_t entry);
 uint64_t* map_crawl(uintptr_t virtual_address, map_layer_t layer);
-
+uint64_t* map_crawl_mark(uintptr_t virtual_address, map_layer_t layer, uint64_t flags);
+void set_pointer(uint64_t* entry, uint64_t physical_address, uint64_t flags);
 
 
 #endif
