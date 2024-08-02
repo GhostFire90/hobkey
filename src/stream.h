@@ -1,7 +1,8 @@
 #ifndef STREAM_H
 #define STREAM_H
 
-#define get_buffer_length(a) (unsigned int)(a->flags>>4) 
+#define get_buffer_length(a) ((unsigned short)(a->flags>>4))
+#define get_buffer_count(a) ((unsigned short)a->flags>>21) 
 #define STREAM_F_BUFFERED  (1<<2)
 #define STREAM_F_WRITEABLE (1<<1)
 #define STREAM_F_READABLE  1
@@ -23,11 +24,11 @@ read:  pointer function called by a read, ignored if the read flag is 0, returns
 
 
 Flags:
-+--------+---------------+----------+----------+-------+------+
-| 64-37  |     36-4      |    3     |    2     |   1   |  0   |
-+--------+---------------+----------+----------+-------+------+
-| unused | buffer_length | blocking | buffered | write | read |
-+--------+---------------+----------+----------+-------+------+
++--------------+---------------+----------+----------+-------+------+
+|    36-21     |     20-4      |    3     |    2     |   1   |  0   |
++--------------+---------------+----------+----------+-------+------+
+| buffer_count | buffer_length | blocking | buffered | write | read |
++--------------+---------------+----------+----------+-------+------+
 */
 struct stream_s{
     WritePred write;

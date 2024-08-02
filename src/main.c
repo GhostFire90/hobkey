@@ -1,11 +1,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "boot_param.h"
 #include "ramdisc.h"
 #include "bmp.h"
-#include "string.h"
-#include "stdlib.h"
+#include "memops.h"
+
 #include "terminal.h"
 #include "idt.h"
 #include <limine.h>
@@ -15,13 +14,7 @@
 #include "virtual_memory_management.h"
 LIMINE_BASE_REVISION(1)
 
-
-
-
-
 #include "psf.h"
-
-const char* message = "Hello";
 
 
 
@@ -61,7 +54,14 @@ int32_t kernel_main(void){
 
     InitializeRamdisc((char*)initrd_begin, initrd.size);
     InitializeTerminal(&fb);
-    printf("Paging remap complete");    
+    printf("Paging remap complete\n");  
+    printf("Testing liballoc\n");
+
+    #include "liballoc.h"
+    char* message = kmalloc(sizeof(char)*12);
+    memcpy(message, "hello world", 12);
+    printf("coppied message: %s", message);
+
 
     while(1){}
     return 0;

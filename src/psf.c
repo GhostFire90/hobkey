@@ -3,7 +3,7 @@
 
 #include "psf.h"
 #include "ramdisc.h"
-#include "string.h"
+#include "memops.h"
 
 #define ROUND_UP_TO_POWER_OF_2(num) \
     do {                             \

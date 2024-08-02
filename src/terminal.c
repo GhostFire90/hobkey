@@ -1,11 +1,10 @@
 #include "terminal.h"
-#include "boot_param.h"
 #include <stdint.h>
 #include "psf.h"
-#include "string.h"
+#include "memops.h"
 #include <stdarg.h>
 #include "ramdisc.h"
-#include "stdlib.h"
+
 #include "idt.h"
 #include <limine.h>
 
@@ -100,7 +99,7 @@ void printf(const char *fmt, ...)
                 {
                     
                     int arg = va_arg(args, int);
-                    itoa(arg, buf, 10);
+                    //itoa(arg, buf, 10);
                     
                 }
                 break;
@@ -108,28 +107,28 @@ void printf(const char *fmt, ...)
                 {
                    
                     int arg = va_arg(args, int);
-                    itoa(arg, buf, 10);
+                    //itoa(arg, buf, 10);
                 }
                 break;
             case 'x':
                 {
 
                     int arg = va_arg(args, int);
-                    itoa(arg, buf, 16);
+                    //itoa(arg, buf, 16);
                     
                 }
                 break;
             case 'b':
                 {
                     int arg = va_arg(args, int);
-                    itoa(arg, buf, 2);
+                    //itoa(arg, buf, 2);
                 }
                 break;
 
             case 's':
                 {
                     const char* arg = va_arg(args, const char*);
-                    
+                    write(arg, strlen(arg));
                 }
                 break;
             case 'c':
@@ -145,7 +144,7 @@ void printf(const char *fmt, ...)
                     char buff[65];
                     write("0x", 2);
                     unsigned long long arg = va_arg(args, unsigned long long);
-                    lltoa(arg, buff, 16);
+                    //lltoa(arg, buff, 16);
                     write(buff, strlen(buff));
                     memset(buf, 0x0, 33);
                 }
@@ -153,7 +152,7 @@ void printf(const char *fmt, ...)
             case 'u':
             {
                 uint32_t arg = va_arg(args, uint32_t);
-                uitoa(arg, buf, 10);
+                //uitoa(arg, buf, 10);
             }
 
             default:

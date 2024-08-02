@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "limine_requests.h"
 #include "PMM.h"
-#include "string.h"
+#include "memops.h"
 
 #define PAGE_SIZE 4096
 

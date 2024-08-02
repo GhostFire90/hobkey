@@ -4,9 +4,12 @@
 #include "PMM.h"
 #include "paging.h"
 
-
+extern uint64_t cannonize(uint64_t x, uint64_t n);
+extern const unsigned char MAXVRTBIT;
 extern void invalidate_page(void*);
 static uint64_t next_kernel_page;
+static uint64_t next_page = 0x100000000;
+static uint64_t pages_allocated = 0;
 
 void initailize_vmm(uint64_t _next_kernel_page)
 {
@@ -39,6 +42,29 @@ void unmap_page(void * virtual)
     set_pointer(entry, 0, 0);
     invalidate_page(entry);
 
+}
+
+void *vm_allocate_page()
+{
+    if(next_page >= 0xffffffff80000000){
+        return 0;
+    }
+    void* ret = (void*)next_page;
+    next_page+=0x1000;
+    pages_allocated++;
+    //ret = (void*)cannonize((uint64_t)ret, MAXVRTBIT);
+    void* phy_page = get_page();
+    allocate_page(map_to_temp(phy_page));
+    unmap_temp();
+    map_phy_to_vrt(ret, phy_page, PAGING_PRESENT | PAGING_RW);
+    //allocate_page(ret);
+
+    return ret;
+}
+
+void vm_free_page(void* pg)
+{
+    unmap_page(pg);
 }
 
 void remap_page(void *old, void *new, uint64_t flags)
