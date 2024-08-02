@@ -24,6 +24,7 @@ unsigned long long initialize_paging();
 //void* map_to_temp(void* addr);
 //unsigned long long get_temp();
 void unmap_temp();
+void *map_to_temp(void *addr);
 bool CustomPagingEnabled(void);
 uint64_t get_pointer(uint64_t entry);
 uint64_t* map_crawl(uintptr_t virtual_address, map_layer_t layer);

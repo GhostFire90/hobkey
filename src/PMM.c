@@ -8,8 +8,8 @@
 #define PAGE_SIZE 4096
 
 
-typedef struct _free_page{
-    struct _free_page* previous;
+typedef struct free_page_s{
+    struct free_page_s* previous;
 } freepage_t;
 
 
