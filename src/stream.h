@@ -1,11 +1,20 @@
 #ifndef STREAM_H
 #define STREAM_H
+#include <stdint.h>
 
 #define get_buffer_length(a) ((unsigned short)(a->flags>>4))
-#define get_buffer_count(a) ((unsigned short)a->flags>>21) 
-#define STREAM_F_BUFFERED  (1<<2)
+#define get_buffer_count(a) ((unsigned short)(a->flags>>21))
+#define BUFFER_COUNT_MASK ((unsigned long)0xFFFF << (unsigned long)21)
+#define BUFFER_LENGTH_MASK ((unsigned long)0xFFFF<<(unsigned long)4)
+
+#define STREAM_F_SEEKABLE  (1<<2)
 #define STREAM_F_WRITEABLE (1<<1)
 #define STREAM_F_READABLE  1
+
+#define STREAM_SEEK_START 0
+#define STREAM_SEEK_CUR 1
+#define STREAM_SEEK_END 2
+
 
 typedef struct stream_s stream_t;
 
@@ -15,6 +24,10 @@ typedef long (*WritePred)(stream_t*, const char*, unsigned long);
 typedef long (*ReadPred)(stream_t*, char*, unsigned long);
 
 typedef int (*FlushPred)(stream_t*);
+
+// SeekPred takes a stream to seek in, and the offest to seek to, 0 and INT64_MAX are reserved for start and end respectively
+// negative values seek backwards, return -1 if not valid seek
+typedef int (*SeekPred)(stream_t*, long, char);
 
 /*
 Do not directly call or interface with this struct, only visible for other stream types to implement it
@@ -27,13 +40,14 @@ Flags:
 +--------------+---------------+----------+----------+-------+------+
 |    36-21     |     20-4      |    3     |    2     |   1   |  0   |
 +--------------+---------------+----------+----------+-------+------+
-| buffer_count | buffer_length | blocking | buffered | write | read |
+| buffer_count | buffer_length | blocking | seekable | write | read |
 +--------------+---------------+----------+----------+-------+------+
 */
 struct stream_s{
     WritePred write;
     ReadPred read;
     FlushPred flush;
+    SeekPred seek;
     unsigned long flags;
     void* functionality;    
 };
@@ -41,5 +55,6 @@ struct stream_s{
 long stream_write(stream_t* stream, const char* bytes, unsigned long length);
 long stream_read(stream_t* stream, char* buffer, unsigned long length);
 int stream_flush(stream_t* stream);
+int stream_seek(stream_t* stream, int64_t offset, char whence);
 
 #endif

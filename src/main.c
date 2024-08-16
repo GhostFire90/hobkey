@@ -5,13 +5,15 @@
 #include "bmp.h"
 #include "memops.h"
 
-#include "terminal.h"
 #include "idt.h"
 #include <limine.h>
 #include "PMM.h"
 #include "paging.h"
 #include "limine_requests.h"
 #include "virtual_memory_management.h"
+#include "framebuffer_stream.h"
+#include "terminal_stream.h"
+#include "liballoc.h"
 LIMINE_BASE_REVISION(1)
 
 #include "psf.h"
@@ -53,16 +55,11 @@ int32_t kernel_main(void){
     }
 
     InitializeRamdisc((char*)initrd_begin, initrd.size);
-    InitializeTerminal(&fb);
-    printf("Paging remap complete\n");  
-    printf("Testing liballoc\n");
+    
+    stream_t* fb_stream = create_framebuffer_stream(&fb);
+    stream_t* term_stream = create_terminal_stream(fb_stream);
+    stream_write(term_stream, "hello world\nabcd\n", 17);
 
-    #include "liballoc.h"
-    char* message = kmalloc(sizeof(char)*12);
-    memcpy(message, "hello world", 12);
-    printf("coppied message: %s", message);
-
-
-    while(1){}
+    while(1);
     return 0;
 }

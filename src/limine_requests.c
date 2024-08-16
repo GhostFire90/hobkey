@@ -36,6 +36,11 @@ static volatile struct limine_stack_size_request stack_size ={
     .stack_size = 0x10000
 };
 
+static volatile struct limine_rsdp_request rsdp_req = {
+    .id = LIMINE_RSDP_REQUEST,
+    .revision = 0
+};
+
 const struct limine_memmap_response *limine_memmap()
 {
     return memmap_req.response;
@@ -59,4 +64,9 @@ const struct limine_module_response *limine_modules()
 const struct limine_framebuffer_response *limine_framebuffer()
 {
     return frame_buffer_req.response;
+}
+
+const struct limine_rsdp_response *limine_rsdp_response()
+{
+    return rsdp_req.response;
 }

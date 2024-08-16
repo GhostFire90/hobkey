@@ -8,14 +8,12 @@
 #include "idt.h"
 #include <limine.h>
 
-#define CHARACTER_SIZE 6
+
 
 static char* frameBuffer;
 static uint32_t width,height;
 static uint32_t x_offset, y_offset;
 static psf_t font;
-static uint64_t font_size;
-
 
 
 void InitializeTerminal(struct limine_framebuffer* fb)

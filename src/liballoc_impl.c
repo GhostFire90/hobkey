@@ -1,5 +1,10 @@
 
 #include "virtual_memory_management.h"
+#include "spinlock.h"
+
+static spinlock_t lock = 0; 
+
+
 /** This function is supposed to lock the memory data structures. It
  * could be as simple as disabling interrupts or acquiring a spinlock.
  * It's up to you to decide. 
@@ -8,9 +13,7 @@
  * failure.
  */
 int liballoc_lock(){
-    asm volatile(
-        "cli"
-    );
+    acquire_lock(&lock);
     return 0;
 }
 
@@ -21,9 +24,7 @@ int liballoc_lock(){
  * \return 0 if the lock was successfully released.
  */
 int liballoc_unlock(){
-    asm volatile(
-        "sti"
-    );
+    release_lock(&lock);
     return 0;
 }
 

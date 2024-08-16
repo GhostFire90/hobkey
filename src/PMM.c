@@ -1,7 +1,6 @@
 #include "PMM.h"
 #include <stdint.h>
 #include <limine.h>
-#include "terminal.h"
 #include "limine_requests.h"
 #include "paging.h"
 

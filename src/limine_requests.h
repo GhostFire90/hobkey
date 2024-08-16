@@ -8,6 +8,7 @@ const struct limine_hhdm_response* limine_hhdm();
 const struct limine_kernel_address_response* limine_kernel_addr();
 const struct limine_module_response* limine_modules();
 const struct limine_framebuffer_response* limine_framebuffer();
+const struct limine_rsdp_response* limine_rsdp_response();
 
 
 #endif
