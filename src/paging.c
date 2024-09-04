@@ -81,6 +81,15 @@ void *map_to_temp(void *addr)
     return temp_map_memory;
 }
 
+void *map_temp_nearest(void *addr)
+{
+    uint64_t current = (uint64_t)addr;
+    uint64_t offset = current%4096;
+    uint64_t page = current-offset;
+    char* temp = map_to_temp((void*)page);
+    return temp+offset;
+}
+
 unsigned long long get_temp()
 {
     return get_pointer(*temp_map_entry);
