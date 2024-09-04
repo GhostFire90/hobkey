@@ -66,7 +66,7 @@ const struct limine_framebuffer_response *limine_framebuffer()
     return frame_buffer_req.response;
 }
 
-const struct limine_rsdp_response *limine_rsdp_response()
+const struct limine_rsdp_response *limine_rsdp()
 {
     return rsdp_req.response;
 }
