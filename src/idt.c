@@ -33,13 +33,13 @@ void createIDTEntry(struct InterruptDescriptor64* entry, uint64_t callback, uint
 struct InterruptDescriptor64* GetIDTR(struct InterruptDescriptor64* idtr_){
     idtr = idtr_;
     for(uint32_t i = 0; i < 256; i++){
-        createIDTEntry(&idtr[i], (uint64_t)empty_int, 0x8e);
+        createIDTEntry(&idtr[i], (uint64_t)empty_int, 0x80 | GATE_INTERRUPT);
     }
     
     return idtr;
 }
 
 void setInterrupt(uint8_t int_num, void* callback, uint8_t type){
-    createIDTEntry(&idtr[int_num], (uint64_t)callback, type);
+    createIDTEntry(&idtr[int_num], (uint64_t)callback, 0x80 | GATE_INTERRUPT);
     refresh_idt();
 }

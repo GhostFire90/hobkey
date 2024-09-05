@@ -31,7 +31,7 @@ $(BUILDDIR)%.s.o: $(SRCDIR)/%.s
 	@nasm -felf64 -Fdwarf -g $< -o $@
 $(BUILDDIR)%.c.o: $(SRCDIR)/%.c
 	@echo [Compiling] $< -> $@
-	@clang -target x86_64-elf -g -O0 -ffreestanding -nostdlib -c -Wno-pointer-sign $< -o $@
+	@clang -target x86_64-elf -g -O0 -ffreestanding -nostdlib -mno-red-zone -c -Wno-pointer-sign $< -o $@
 	
 casm:
 	i686-elf-gcc -S ${CSRC}
@@ -64,7 +64,7 @@ LIMINE_SETUP:
 
 .PHONY: qemu
 qemu:
-	qemu-system-x86_64 -bios OVMF.fd -m $(MEMORY) -cdrom ${OUTDIR}/boot.iso -no-reboot -no-shutdown -D qemu_log.txt -vga std
+	qemu-system-x86_64 -bios OVMF.fd -m $(MEMORY) -cdrom ${OUTDIR}/boot.iso -no-reboot -no-shutdown -D qemu_log.txt
 
 .PHONY: qemu_gdb
 qemu_gdb:

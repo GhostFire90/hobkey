@@ -46,6 +46,8 @@ section .text
         ;mov ebx, esp
         ;mov esp, $stack_top  
 
+        mov rdx, 1
+        mov CR8, rdx
         call setGdt
         call setup_idt
     

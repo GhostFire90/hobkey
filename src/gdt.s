@@ -1,6 +1,8 @@
    
 section .data
     align 8
+
+
     gdt_desc:
         dq 0
         dq 0x00af9b000000ffff
