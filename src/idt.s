@@ -29,5 +29,5 @@ section .text
         ret
 
     empty_int:
-        iret
+        iretq
 

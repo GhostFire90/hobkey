@@ -21,6 +21,12 @@ LIMINE_BASE_REVISION(1)
 #include "psf.h"
 
 
+stream_t* term_stream = 0;
+
+//temp
+stream_t* get_terminal(){
+    return term_stream;
+}
 
 int32_t kernel_main(void){
 
@@ -65,7 +71,7 @@ int32_t kernel_main(void){
         }
         fb.address = fb_begin;
         //memset(fb_begin, 0xff, fb_size);
-
+    
         //i should change this for relocation probably
         initrd_begin = (void*)(next_kernel_address+fb_pages*PAGE_SIZE);
         uint64_t initrd_phy = (uint64_t)initrd.address-hhdm_offset;
@@ -78,11 +84,10 @@ int32_t kernel_main(void){
         initialize_tables(map_temp_nearest((void*)((uint64_t)rsdp.address-hhdm_offset)));
         unmap_temp();
     }
-    apic_initialize();
     InitializeRamdisc((char*)initrd_begin, initrd_size);
-    
-    stream_t* term_stream = create_terminal_stream(fb_stream);
-    stream_write(term_stream, "hello world\nabcd\n", 17);
+    term_stream = create_terminal_stream(fb_stream);
+    apic_initialize();
+    //stream_write(term_stream, "hello world\nabcd\n", 17);
 
     while(1);
     return 0;
