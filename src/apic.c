@@ -75,7 +75,7 @@ void apic_initialize(void){
     
 }
 void apic_test_C(void){
-    stream_write(get_terminal(), "h\n", 2);
+    //stream_write(get_terminal(), "h\n", 2);
     volatile uint32_t* EOI = (uint32_t*)(apic_address+EOI_OFFSET);
     *EOI=0;
     return;
