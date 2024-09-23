@@ -21,12 +21,9 @@ LIMINE_BASE_REVISION(1)
 #include "psf.h"
 
 
-stream_t* term_stream = 0;
 
-//temp
-stream_t* get_terminal(){
-    return term_stream;
-}
+
+
 
 int32_t kernel_main(void){
 
@@ -85,9 +82,9 @@ int32_t kernel_main(void){
         unmap_temp();
     }
     InitializeRamdisc((char*)initrd_begin, initrd_size);
-    term_stream = create_terminal_stream(fb_stream);
+    stream_t* term_stream = create_terminal_stream(fb_stream);
     apic_initialize();
-    //stream_write(term_stream, "hello world\nabcd\n", 17);
+    stream_write(term_stream, "hello world\nabcd\n", 17);
 
     while(1);
     return 0;

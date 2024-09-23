@@ -41,6 +41,11 @@ static volatile struct limine_rsdp_request rsdp_req = {
     .revision = 0
 };
 
+static volatile struct limine_smp_request smp_req ={
+    .id = LIMINE_SMP_REQUEST,
+    .revision = 0
+};
+
 const struct limine_memmap_response *limine_memmap()
 {
     return memmap_req.response;

@@ -17,6 +17,7 @@
 }
 
 typedef struct term_stream_s{
+    stream_t s;
     char* buffer;
     stream_t* fb;
     psf_t font;
@@ -47,7 +48,7 @@ void term_putc(terminal_t* term, char byte){
 }
 
 long term_write(stream_t* stream, const char* bytes, unsigned long length){
-    terminal_t* term = stream->functionality;
+    terminal_t* term = (terminal_t*)stream;
     unsigned short count = get_buffer_count(stream);
     unsigned long pitch = framebuffer_get_pitch(term->fb);
 
@@ -67,7 +68,7 @@ long term_write(stream_t* stream, const char* bytes, unsigned long length){
 
 }
 int term_flush(stream_t* stream){
-    terminal_t* term = stream->functionality;
+    terminal_t* term = (terminal_t*)stream;
     unsigned short count = get_buffer_count(stream);
 
     for(uint16_t i = 0; i < count; i++){
@@ -79,18 +80,18 @@ int term_flush(stream_t* stream){
 stream_t *create_terminal_stream(stream_t *fb_stream)
 {
 
-    stream_t* ret = kmalloc(sizeof(stream_t));
+    //stream_t* ret = kmalloc(sizeof(stream_t));
     terminal_t* term = kmalloc(sizeof(terminal_t));
 
-    ret->flags = STREAM_F_SEEKABLE | STREAM_F_WRITEABLE | ((unsigned long)0x1000<<4);
-    ret->flush = term_flush;
-    ret->write = term_write;
-    ret->functionality = (void*)term;
+    term->s.flags = STREAM_F_SEEKABLE | STREAM_F_WRITEABLE | ((unsigned long)0x1000<<4);
+    term->s.flush = term_flush;
+    term->s.write = term_write;
+    
     
     term->buffer = kmalloc(4096);
     term->fb = fb_stream;
 
     GetPsf(&term->font, "resources/zap-vga.psf");
     
-    return ret;
+    return (stream_t*)term;
 }

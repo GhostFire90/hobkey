@@ -6,6 +6,7 @@
 typedef struct framebuffer_stream_s framebuffer_stream_t;
 struct framebuffer_stream_s
 {
+    stream_t s;
     char* start;
     char* current;
     char* end;
@@ -17,14 +18,14 @@ struct framebuffer_stream_s
     
 
 long fb_write(stream_t* stream, const char* buffer, unsigned long length){
-    framebuffer_stream_t* fb_stream = stream->functionality;
+    framebuffer_stream_t* fb_stream = (framebuffer_stream_t*)stream;
     memcpy(fb_stream->current, buffer, length);
     fb_stream->current+=length;
     return length;
 }
 
 int fb_seek(stream_t* stream, int64_t offset, char whence){
-    framebuffer_stream_t* fb = stream->functionality;
+    framebuffer_stream_t* fb = (framebuffer_stream_t*)stream;
     char* position = 0;
     switch (whence)
     {
@@ -52,7 +53,7 @@ int fb_seek(stream_t* stream, int64_t offset, char whence){
 stream_t *create_framebuffer_stream(struct limine_framebuffer *fb)
 {
     framebuffer_stream_t* fb_stream = kmalloc(sizeof(framebuffer_stream_t));
-    stream_t* ret = kmalloc(sizeof(stream_t));
+    //stream_t* ret = kmalloc(sizeof(stream_t));
 
     fb_stream->width = fb->width;
     fb_stream->height = fb->height;
@@ -61,35 +62,35 @@ stream_t *create_framebuffer_stream(struct limine_framebuffer *fb)
     fb_stream->start = fb_stream->current = fb->address;
     fb_stream->end = fb_stream->start + (fb_stream->height*fb_stream->pitch);
 
-    ret->flags = STREAM_F_WRITEABLE | STREAM_F_SEEKABLE;
-    ret->functionality = (void*)fb_stream;
-    ret->write = fb_write;
-    ret->seek = fb_seek;
+    fb_stream->s.flags = STREAM_F_WRITEABLE | STREAM_F_SEEKABLE;
+    
+    fb_stream->s.write = fb_write;
+    fb_stream->s.seek = fb_seek;
 
 
-    return ret;
+    return (stream_t*)fb_stream;
 }
 
 unsigned long framebuffer_get_width(stream_t *fb)
 {
-    framebuffer_stream_t* fb_stream = fb->functionality;
+    framebuffer_stream_t* fb_stream = (framebuffer_stream_t*)fb;
     return fb_stream->width;
 }
 
 unsigned long framebuffer_get_height(stream_t *fb)
 {
-    framebuffer_stream_t* fb_stream = fb->functionality;
+    framebuffer_stream_t* fb_stream = (framebuffer_stream_t*)fb;
     return fb_stream->height;
 }
 
 unsigned long framebuffer_get_pitch(stream_t *fb)
 {
-    framebuffer_stream_t* fb_stream = fb->functionality;
+    framebuffer_stream_t* fb_stream = (framebuffer_stream_t*)fb;
     return fb_stream->pitch;
 }
 
 unsigned short framebuffer_get_bpp(stream_t *fb)
 {
-    framebuffer_stream_t* fb_stream = fb->functionality;
+    framebuffer_stream_t* fb_stream = (framebuffer_stream_t*)fb;
     return fb_stream->bpp;
 }

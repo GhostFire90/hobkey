@@ -48,8 +48,7 @@ struct stream_s{
     ReadPred read;
     FlushPred flush;
     SeekPred seek;
-    unsigned long flags;
-    void* functionality;    
+    unsigned long flags; 
 };
 
 long stream_write(stream_t* stream, const char* bytes, unsigned long length);
