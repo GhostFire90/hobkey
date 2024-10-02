@@ -1,24 +1,23 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "ramdisc.h"
-#include "bmp.h"
-#include "memops.h"
+#include <helpers/ramdisc.h>
+#include <helpers/memops.h>
 
 #include "idt.h"
 #include <limine.h>
-#include "PMM.h"
-#include "paging.h"
-#include "limine_requests.h"
-#include "apic.h"
-#include "virtual_memory_management.h"
-#include "framebuffer_stream.h"
-#include "terminal_stream.h"
-#include "system_tables.h"
-#include "liballoc.h"
+#include <memory/PMM.h>
+#include <memory/paging.h>
+#include <helpers/limine_requests.h>
+#include <timers/apic.h>
+#include <memory/virtual_memory_management.h>
+#include <streams/framebuffer_stream.h>
+#include <streams/terminal_stream.h>
+#include <helpers/system_tables.h>
+#include <memory/liballoc.h>
 LIMINE_BASE_REVISION(1)
 
-#include "psf.h"
+#include <helpers/psf.h>
 
 
 

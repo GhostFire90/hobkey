@@ -2,7 +2,7 @@ import os
 
 env = Environment(
     tools=['nasm', 'clang', 'default'],
-    CCFLAGS="-target x86_64-elf -g -O0 -ffreestanding -nostdlib -mno-red-zone -Wno-pointer-sign",
+    CCFLAGS="-target x86_64-elf -g -O0 -I src -ffreestanding -nostdlib -mno-red-zone -Wno-pointer-sign",
     ASFLAGS="-felf64 -Fdwarf -g",
     LINK='clang',
     CC='clang',

@@ -1,6 +1,6 @@
 
 #include "virtual_memory_management.h"
-#include "spinlock.h"
+#include <spinlock.h>
 
 static spinlock_t lock = 0; 
 
