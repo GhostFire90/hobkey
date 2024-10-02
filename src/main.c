@@ -10,6 +10,7 @@
 #include <memory/paging.h>
 #include <helpers/limine_requests.h>
 #include <timers/apic.h>
+#include <timers/hpet.h>
 #include <memory/virtual_memory_management.h>
 #include <streams/framebuffer_stream.h>
 #include <streams/terminal_stream.h>
@@ -83,6 +84,7 @@ int32_t kernel_main(void){
     InitializeRamdisc((char*)initrd_begin, initrd_size);
     stream_t* term_stream = create_terminal_stream(fb_stream);
     apic_initialize();
+    hpet_initialize();
     stream_write(term_stream, "hello world\nabcd\n", 17);
 
     while(1);
