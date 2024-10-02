@@ -1,7 +1,7 @@
 #include "framebuffer_stream.h"
 #include <stdint.h>
-#include "liballoc.h"
-#include "memops.h"
+#include <memory/liballoc.h>
+#include <helpers/memops.h>
 
 typedef struct framebuffer_stream_s framebuffer_stream_t;
 struct framebuffer_stream_s

@@ -1,7 +1,7 @@
 #include "terminal_stream.h"
 #include "framebuffer_stream.h"
-#include "psf.h"
-#include "liballoc.h"
+#include <helpers/psf.h>
+#include <memory/liballoc.h>
 
 #define WHITE 0xFFFFFFFF
 

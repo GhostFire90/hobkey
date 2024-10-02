@@ -1,8 +1,8 @@
 #include "apic.h"
-#include "system_tables.h"
-#include "idt.h"
-#include "virtual_memory_management.h"
-#include "stream.h"
+#include <helpers/system_tables.h>
+#include <idt.h>
+#include <memory/virtual_memory_management.h>
+#include <streams/stream.h>
 #include <stdint.h>
 
 #define PIC1 0x20

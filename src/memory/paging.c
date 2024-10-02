@@ -1,9 +1,9 @@
 #include "paging.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "limine_requests.h"
-#include "PMM.h"
-#include "memops.h"
+#include <helpers/limine_requests.h>
+#include <memory/PMM.h>
+#include <helpers/memops.h>
 
 #define PAGE_SIZE 4096
 

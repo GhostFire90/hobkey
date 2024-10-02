@@ -1,3 +1,0 @@
-volatile void foo(){
-    return;
-}

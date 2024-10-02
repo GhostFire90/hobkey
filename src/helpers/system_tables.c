@@ -1,9 +1,9 @@
-#include "system_tables.h"
+#include <helpers/system_tables.h>
 #include <stdint.h>
-#include "limine_requests.h"
-#include "memops.h"
-#include "paging.h"
-#include "virtual_memory_management.h"
+#include <helpers/limine_requests.h>
+#include <helpers/memops.h>
+#include <memory/paging.h>
+#include <memory/virtual_memory_management.h>
 
 struct XSDT{
     struct ACPISDTHeader header;
