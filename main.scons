@@ -1,0 +1,35 @@
+import os
+
+env = Environment(
+    tools=['nasm', 'clang', 'default'],
+    CCFLAGS="-target x86_64-elf -g -O0 -ffreestanding -nostdlib -mno-red-zone -Wno-pointer-sign",
+    ASFLAGS="-felf64 -Fdwarf -g",
+    LINK='clang',
+    CC='clang',
+    AS='nasm',
+    LINKFLAGS="-T linker.ld -no-pie -ffreestanding -nostdlib",
+    )
+
+
+CSrc = Glob('src/*.c') + Glob('src/*/*.c')
+ASrc = Glob('src/*.s') + Glob('src/*/*.s')
+
+sources = CSrc+ASrc
+objects = []
+
+for src in sources:
+    base, ext = os.path.splitext(str(src))
+    if ext == '.c':
+        obj_name = f'{base}_c.o'
+        obj = env.Object(target=obj_name, source=src)
+        objects.append(obj)
+    elif ext == '.s':
+        obj_name = f'{base}_s.o'
+        obj = env.Object(target=obj_name, source=src)
+        objects.append(obj)
+    else:
+        continue  # Skip unknown extensions
+
+    # Build the object files
+
+env.Program(target='../out/kernel.bin', source=objects)
