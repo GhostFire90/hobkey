@@ -1,0 +1,15 @@
+[package]
+name = "hobkey-rs"
+version = "0.1.0"
+edition = "2021"
+
+
+[workspace]
+members = [
+    "hobkey-rs-proc"
+]
+
+[dependencies]
+lazy_static = {version = "*", features = ["spin_no_std"]}
+limine = "0.3.1"
+hobkey-rs-proc = {path="hobkey-rs-proc"}

@@ -1,1 +1,0 @@
-SConscript('main.scons', variant_dir='build', dupicate=0)

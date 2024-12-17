@@ -1,8 +1,0 @@
-build/
-iso/
-out/
-.vscode/
-OVMF.fd
-limine_iso/
-qemu_log.txt
-.sconsign.dblite
