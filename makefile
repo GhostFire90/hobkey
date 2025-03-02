@@ -1,5 +1,6 @@
 LIMINE_ROOT=target/limine
 LIMINE_INSTALL_DIR = /usr/local/share/limine
+INITRD=initrd.tar
 
 
 limine: iso_fs
@@ -11,10 +12,13 @@ limine: iso_fs
         -efi-boot-part --efi-boot-image --protective-msdos-label \
         ${LIMINE_ROOT} -o boot.iso 1> /dev/null 2>&1
 
-${LIMINE_ROOT}:
+${LIMINE_ROOT}: ${INITRD}
 	@mkdir -p "${LIMINE_ROOT}"/EFI/BOOT
 	@mkdir -p "${LIMINE_ROOT}"/boot
+	@cp initrd.tar "${LIMINE_ROOT}"/boot/
 
+${INITRD}:
+	@tar -uf initrd.tar -C initrd -H ustar .
 iso_fs: ${LIMINE_ROOT}
 	@cp "${LIMINE_INSTALL_DIR}"/limine-uefi-cd.bin "${LIMINE_ROOT}" 
 	@cp "${LIMINE_INSTALL_DIR}"/limine-bios-cd.bin "${LIMINE_ROOT}" 
@@ -24,12 +28,14 @@ iso_fs: ${LIMINE_ROOT}
 
 .PHONY: qemu
 qemu: limine
-	qemu-system-x86_64 -bios OVMF.fd  -cdrom boot.iso -no-reboot -no-shutdown -D qemu_log.txt
+	qemu-system-x86_64 -bios OVMF.fd -d int -cdrom boot.iso -no-reboot -no-shutdown -D qemu_log.txt -serial file:os_log.txt
 
 .PHONY: qemu_db
 qemu_db: limine
-	qemu-system-x86_64 -bios OVMF.fd  -cdrom boot.iso -no-reboot -no-shutdown -D qemu_log.txt -s -S &
-	gdb -x target.gdb 
+	qemu-system-x86_64 -bios OVMF.fd -d int -cdrom boot.iso -no-reboot -no-shutdown -D qemu_log.txt -serial file:os_log.txt -s -S &
+	rust-gdb -x target.gdb 
 .PHONY: clean
 clean:
 	@cargo clean
+	rm initrd.tar
+	rm boot.iso

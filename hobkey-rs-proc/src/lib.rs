@@ -30,18 +30,18 @@ pub fn preserve_temp_map(_ : TokenStream, item : TokenStream) -> TokenStream{
     //println!("{:?}",indexes);
     if indexes.len() != 0{
         for i in indexes{
-            fn_body.block.stmts.insert(i, syn::parse(quote!(crate::memory::paging::PageTableManager::map_temp(tmp_mapped);).into()).unwrap());
+            fn_body.block.stmts.insert(i, syn::parse(quote!(crate::memory::paging::PageTableManager::map_temp(tmp_mapped).unwrap();).into()).unwrap());
             
         }
     }
     else{
-        fn_body.block.stmts.insert(fn_body.block.stmts.len(), syn::parse(quote!(crate::memory::paging::PageTableManager::map_temp(tmp_mapped);).into()).unwrap());
+        fn_body.block.stmts.insert(fn_body.block.stmts.len(), syn::parse(quote!(crate::memory::paging::PageTableManager::map_temp(tmp_mapped).unwrap();).into()).unwrap());
     }
     
 
     use quote::ToTokens;
     
     let ret = body.into_token_stream().into();
-    //println!("{}", ret);
+    println!("{}", ret);
     ret
 }

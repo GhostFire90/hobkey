@@ -39,5 +39,5 @@ SECTIONS{
         *(.eh_frame)
         *(.note .note.*)
     }
-
+    __KERNEL_END__ = .;
 }
