@@ -1,4 +1,3 @@
-use core::arch::asm;
 use core::ffi::CStr;
 use core::fmt;
 
@@ -54,7 +53,7 @@ pub extern "C" fn kmain() -> !{
     
 
     let _f = ustar::find_file("./test.txt", initrd_addr as *const u8, initrd_size as usize).unwrap();
-    let txt = unsafe {CStr::from_ptr((initrd_addr as usize+_f.1) as *const i8)}
+    let _txt = unsafe {CStr::from_ptr((initrd_addr as usize+_f.1) as *const i8)}
                     .to_str()
                     .unwrap();
     

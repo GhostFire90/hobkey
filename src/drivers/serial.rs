@@ -10,6 +10,7 @@ pub enum SerialError{
 
 pub const COM0 : u16 = 0x3F8;
 
+#[allow(dead_code)]
 impl Serial{
 
     pub const fn new_uninit(port : u16) -> Self{
