@@ -11,6 +11,7 @@ struct InterruptDescriptor64 {
 }
 
 pub const GATE_INTERRUPT : u8 = 0x0E;
+#[allow(dead_code)]
 pub const GATE_TRAP      : u8 = 0x0F;
 pub const GATE_PRESENT   : u8 = 0x80;
 
