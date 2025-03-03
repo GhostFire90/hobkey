@@ -1,5 +1,10 @@
 # Hobkey
 
+# OLD VERSION
+This is the old version of the kernel back when i was writing it in C, I've decided as an experiment to switch over to rust (the `main` branch), this eventually will be behind the `main` branch in features.
+this is ***NOT*** a fully formed kernel
+
+
 
 ## Desc
 Hobkey is a playground for messing around with kernel level things for me, a learning environment
