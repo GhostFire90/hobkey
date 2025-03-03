@@ -1,8 +1,6 @@
-build/
-iso/
-out/
+/target
 .vscode/
-OVMF.fd
-limine_iso/
-qemu_log.txt
-.sconsign.dblite
+*log*
+*.iso
+out/
+build/
