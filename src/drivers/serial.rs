@@ -1,4 +1,4 @@
-use crate::utils::{inb, outb};
+use crate::utils::io_port_helper::{inb, outb};
 pub struct Serial{
     port : u16
 }

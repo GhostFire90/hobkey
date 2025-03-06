@@ -25,6 +25,7 @@ static PHANDLER_SERIAL : Spinlock<Serial> = Spinlock::new(Serial::new_uninit(ser
 
 #[panic_handler]
 fn phandler(inf : &PanicInfo<'_>) ->!{
+    
     fmt::write(PHANDLER_SERIAL.lock().get_mut(), format_args!("{}", inf)).unwrap();
     loop {
         
