@@ -1,6 +1,5 @@
 use core::ffi::CStr;
 
-use limine::cstr;
 
 
 #[derive(Clone, Copy)]
@@ -34,9 +33,11 @@ pub enum UstarFileType{
     FifoPipe,
     Unknown
 }
-impl Into<u8> for UstarFileType{
-    fn into(self) -> u8 {
-        match self  {
+impl From<UstarFileType> for u8{
+    
+    
+    fn from(value: UstarFileType) -> Self {
+        match value  {
             UstarFileType::Normal   => 0,
             UstarFileType::SymLink  => 1,
             UstarFileType::CharDev  => 2,
@@ -47,6 +48,7 @@ impl Into<u8> for UstarFileType{
         }
     }
 }
+
 impl From<u8> for UstarFileType{
     fn from(value: u8) -> Self {
         match value {
@@ -72,7 +74,7 @@ pub enum UstarError{
 pub fn find_file(filename : &str, arc : *const u8, len : usize) -> Result<(UstarHeader, usize), UstarError>{
 
     let mut current_idx = 0;
-    const CORRECT_MAG : &core::ffi::CStr= cstr!("ustar");
+    const CORRECT_MAG : &core::ffi::CStr= c"ustar";
 
 
     while current_idx < len{
@@ -96,8 +98,8 @@ pub fn find_file(filename : &str, arc : *const u8, len : usize) -> Result<(Ustar
             if CStr::from_bytes_until_nul(&full_name).unwrap().to_str().unwrap() == filename{
                 return Ok((header, current_idx+512));
             }
-
-            current_idx += 512 + crate::helpers::atoi(&header.size_ascii_octal, 8).ok_or(UstarError::IncorrectFormat)?;
+            
+            current_idx += 512 + crate::helpers::atou(&header.size_ascii_octal, 8).ok_or(UstarError::IncorrectFormat)?;
         }
         else {
             return Err(UstarError::IncorrectFormat)

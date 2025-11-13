@@ -315,7 +315,7 @@ impl PageTableManager{
             
             let offset = HHDM_REQ.get_response().unwrap().offset();
 
-            return Ok(virt_addr-offset);
+            Ok(virt_addr-offset)
         }
         else{
 
@@ -323,23 +323,23 @@ impl PageTableManager{
             match res{
                 Ok(x) => {
                     let entry = unsafe{x.read()};
-                    return Ok(entry.get_pointer());
+                    Ok(entry.get_pointer())
                 }
                 Err(e) => {
-                    return Err(e);
+                    Err(e)
                 }
             }
         }
     }
     pub fn get_temp() -> PhysicalAddress{
         if !PAGE_TABLE_MANAGER.lock().get().ready{
-            return 0;
+            0
         }
         else {
             let tmp = PAGE_TABLE_MANAGER.lock().get().tmp_entry_address as *const TableEntry;
-            return unsafe {
+            unsafe {
                 tmp.read().get_pointer()
-            };
+            }
         }
     }
 
@@ -357,7 +357,7 @@ impl PageTableManager{
             }
             ret = PageTableManager::map_temp(phy)? as *mut TableEntry; 
         }
-        return Ok(unsafe{ret.add(indexes[l].into())});
+        Ok(unsafe{ret.add(indexes[l].into())})
     }
 
     pub(self) fn crawl_alloc(virt : VirtualAddress, table_layer : TableLayer, flags : u64) -> *mut TableEntry{
@@ -374,7 +374,7 @@ impl PageTableManager{
             unsafe {ret.add(indexes[i] as usize).write(entry)}
             ret = PageTableManager::map_temp(entry.get_pointer()).unwrap() as *mut TableEntry; 
         }
-        return unsafe{ret.add(indexes[l].into())};
+        unsafe{ret.add(indexes[l].into())}
     }
 }
 impl TableEntry {
@@ -432,20 +432,22 @@ impl TableEntry{
         }
     }
 }
-impl Into<u64> for TableEntry {
-    fn into(self) -> u64 {
-        self.0
+
+impl From<TableEntry> for u64{
+    fn from(value: TableEntry) -> Self {
+        value.0
     }
 }
+
 impl From<u64> for TableEntry{
     fn from(value: u64) -> Self {
         Self(value)
     }
 }
 
-impl Into<usize> for TableLayer{
-    fn into(self) -> usize {
-        match self {
+impl From<TableLayer> for usize{
+    fn from(value: TableLayer) -> Self {
+        match value {
             TableLayer::PML4 => 0,
             TableLayer::PDPT => 1,
             TableLayer::PDT => 2,
@@ -453,3 +455,4 @@ impl Into<usize> for TableLayer{
         }
     }
 }
+

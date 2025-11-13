@@ -12,5 +12,5 @@ members = [
 
 
 [dependencies]
-limine = "0.3.1"
+limine = "0.4.0"
 hobkey-rs-proc = {path="hobkey-rs-proc"}

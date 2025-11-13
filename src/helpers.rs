@@ -1,5 +1,5 @@
 
-pub fn atoi(bytes : &[u8], base : u8) -> Option<usize>{
+pub fn atou(bytes : &[u8], base : u8) -> Option<usize>{
     if base > 16{
         None
     }

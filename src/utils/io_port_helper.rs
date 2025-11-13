@@ -21,3 +21,25 @@ pub fn outb(port : u16, byte : u8){
         )
     }
 }
+
+pub fn inl(port : u16) -> u32{
+    let mut ret : u32;
+    unsafe {
+        asm!(
+            "in eax, dx",
+            in("dx") port,
+            out("eax") ret
+        )
+    }
+    ret
+}
+
+pub fn outl(port : u16, data : u32){
+    unsafe{
+        asm!(
+            "out dx, eax",
+            in("dx") port,
+            in("eax") data
+        )
+    }
+}

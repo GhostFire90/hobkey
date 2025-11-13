@@ -37,11 +37,11 @@ pub extern "C" fn kmain() -> !{
     }
 
     let modules = MODULE_REQ.get_response().unwrap().modules();
-    let initrd_mod = modules.iter().find(|x|cstrcmp(x.path(), "/boot/initrd.tar".as_bytes())).unwrap();
+    let initrd_mod = modules.iter().find(|x|cstrcmp(x.path().to_bytes(), "/boot/initrd.tar".as_bytes())).unwrap();
     let hhdm_offset = HHDM_REQ.get_response().unwrap().offset();
     let initrd_addr = initrd_mod.addr() as u64;
     let initrd_phy = initrd_addr-hhdm_offset;
-    let initrd_size = initrd_mod.size() + (4096 - (initrd_mod.size() % 4096));
+    let initrd_size = initrd_mod.size().next_multiple_of(4096);
 
     PMM::init();
     PMM::reclaim_bootloader().unwrap();
