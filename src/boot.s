@@ -3,12 +3,13 @@
     .globl MAX_PHY_BIT
     .globl MAX_VRT_BIT
     .globl STACK_TOP
-    MAX_PHY_BIT:  .space 1
-    MAX_VRT_BIT:  .space 1
 
     STACK_BOTTOM:
     .space (1024*16), 0
     STACK_TOP: 
+
+    MAX_PHY_BIT:  .space 1
+    MAX_VRT_BIT:  .space 1
     
 .text
     get_phybit:

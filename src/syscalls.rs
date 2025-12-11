@@ -36,7 +36,6 @@ macro_rules! syscall {
         "int 0x80",
         in("rax") $num,
         lateout("rax") ret,
-        clobber_abi("sysv64")
       );
     }
     ret
@@ -51,7 +50,6 @@ macro_rules! syscall {
       in("rax") $num,
       in("rdi") $a1,
       lateout("rax") ret,
-      clobber_abi("sysv64"),
     );}
     ret
   }};
@@ -67,7 +65,6 @@ macro_rules! syscall {
       in("rdi") $a1,
       in("rsi") $a2,
       lateout("rax") ret,
-      clobber_abi("sysv64"),
     );}
     ret
   }};
@@ -85,7 +82,6 @@ macro_rules! syscall {
       in("rsi") $a2,
       in("rdx") $a3,
       lateout("rax") ret,
-      clobber_abi("sysv64"),
     );}
     ret
   }};
@@ -105,7 +101,6 @@ macro_rules! syscall {
       in("rdx") $a3,
       in("rcx") $a4,
       lateout("rax") ret,
-      clobber_abi("sysv64"),
     );}
     ret
   }};
@@ -127,7 +122,6 @@ macro_rules! syscall {
       in("rcx") $a4,
       in("r8")  $a5,
       lateout("rax") ret,
-      clobber_abi("sysv64"),
     );}
     ret
   }};
@@ -152,7 +146,6 @@ macro_rules! syscall {
         in("r8")  $a5,
         in("r9")  $a6,
         lateout("rax") ret,
-        clobber_abi("sysv64"),
       );
     }
     ret

@@ -50,17 +50,8 @@ extern "C" {
 
 const PAGE_LAYOUT: Layout = unsafe { Layout::from_size_align_unchecked(PS_USIZE, PS_USIZE) };
 
-static FAKE_HEAP_SIZE: usize = PS_USIZE * 1024 * 1024;
-
+#[global_allocator]
 pub static KALLOC: MetaAlloc = MetaAlloc::new(0xffffffff8001b000, 0x7FFE5000);
-
-struct FakeHeap
-{
-  base: *mut u8,
-  current_top: usize,
-}
-// only using when wrapped in a mutex
-unsafe impl Send for FakeHeap {}
 
 struct MetaAllocInner
 {
@@ -130,7 +121,7 @@ impl MetaAllocInner
       0,
       pg,
       location.addr().get() as u64,
-      PAGING_PRESENT | PAGING_RW
+      (PAGING_PRESENT | PAGING_RW)
     ) as i8)
       < 0
     {
@@ -142,39 +133,38 @@ impl MetaAllocInner
 
   unsafe fn alloc(&mut self, layout: Layout) -> *mut u8
   {
-    if self.list.empty()
+    loop
     {
+      if self.list.empty()
+      {
+        if !unsafe { self.try_add_page() }
+        {
+          return core::ptr::null_mut();
+        }
+      }
+
+      let mut cursor = self.list.cursor_mut();
+      cursor.move_next();
+      while let Some(current) = cursor.current_value()
+      {
+        if current.check_compatible(&layout)
+        {
+          let node = cursor.remove().unwrap();
+
+          let (ret_node, remaining) = Self::node_split(node, layout);
+          if let Some(rem) = remaining
+          {
+            unsafe { self.dealloc(Self::node_to_data_ptr(rem), (*rem.as_ptr()).elem().layout) };
+          }
+          return Self::node_to_data_ptr(ret_node);
+        }
+        cursor.move_next();
+      }
+
       if !unsafe { self.try_add_page() }
       {
         return core::ptr::null_mut();
       }
-    }
-
-    let mut cursor = self.list.cursor_mut();
-    cursor.move_next();
-    while let Some(current) = cursor.current_value()
-    {
-      if current.check_compatible(&layout)
-      {
-        let node = cursor.remove().unwrap();
-
-        let (ret_node, remaining) = Self::node_split(node, layout);
-        if let Some(rem) = remaining
-        {
-          unsafe { self.dealloc(Self::node_to_data_ptr(rem), (*rem.as_ptr()).elem().layout) };
-        }
-        return Self::node_to_data_ptr(ret_node);
-      }
-      cursor.move_next();
-    }
-
-    if !unsafe { self.try_add_page() }
-    {
-      core::ptr::null_mut()
-    }
-    else
-    {
-      unsafe { self.alloc(layout) }
     }
   }
 

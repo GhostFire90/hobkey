@@ -11,9 +11,6 @@ use core::fmt::Write;
 use core::ops::{RangeInclusive, Shl};
 use core::{fmt, include_str};
 
-use limine::request::StackSizeRequest;
-static STACK_SIZE_REQ: StackSizeRequest = StackSizeRequest::new().with_size(PAGE_SIZE);
-
 global_asm!(include_str!("paging.s"));
 
 extern "sysv64" {
@@ -284,7 +281,10 @@ impl PageTableManager
 
     set_cr3(ptm.phy_addr);
     serial
-      .write_fmt(format_args!("HEAP_LOCATION : 0x{:x}", kend + PAGE_SIZE * 3))
+      .write_fmt(format_args!(
+        "HEAP_LOCATION : 0x{:x}\n",
+        kend + PAGE_SIZE * 3
+      ))
       .unwrap();
     KALLOC.set_base(kend + PAGE_SIZE * 3);
     Ok(())
@@ -313,6 +313,53 @@ impl PageTableManager
       0
     }
   }
+
+  pub extern "sysv64" fn unmap(virt_addr: VirtualAddress, free_phy: bool) -> i8
+  {
+    if virt_addr % PAGE_SIZE != 0
+    {
+      return -1;
+    }
+
+    let r_entry = PageTableManager::crawl(virt_addr, TableLayer::PT);
+    if let Ok(entry) = r_entry
+    {
+      unsafe {
+        let ret = (*entry).get_pointer();
+        (*entry).set_flags(0);
+        if free_phy
+        {
+          PMM::push_page(ret);
+        }
+        0
+      }
+    }
+    else
+    {
+      -1
+    }
+  }
+
+  pub fn unmap_range(virt: RangeInclusive<VirtualAddress>, free_phy: bool) -> Result<(), PtmError>
+  {
+    if (virt.end() - virt.start()) % PAGE_SIZE != 0
+    {
+      return Err(PtmError::IncorrectPageSize);
+    }
+    else if (virt.start() % PAGE_SIZE) != 0
+    {
+      return Err(PtmError::UnallignedPage);
+    }
+    for pg in virt.step_by(PAGE_SIZE as usize)
+    {
+      if Self::unmap(pg, free_phy) == -1
+      {
+        return Err(PtmError::NoMapping(pg));
+      }
+    }
+    Ok(())
+  }
+
   pub fn map_range(
     phy: RangeInclusive<PhysicalAddress>,
     virt: RangeInclusive<VirtualAddress>,
@@ -464,7 +511,7 @@ impl PageTableManager
 }
 impl TableEntry
 {
-  pub fn generate_phy_mask() -> u64
+  pub const fn generate_phy_mask() -> u64
   {
     unsafe {
       let upper = (1 << (MAX_PHY_BIT - 1)) - 1;

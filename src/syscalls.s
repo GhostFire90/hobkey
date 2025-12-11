@@ -32,10 +32,12 @@
         push r13
         push r14
         push r15
-
+        
+        push rdx
         mov rbx, 8
         mul rbx
-        
+        pop rdx
+
         pop rbx
         push rbx
 

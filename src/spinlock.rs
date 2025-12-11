@@ -25,7 +25,7 @@ impl<T> Spinlock<T>
     }
   }
 
-  pub fn lock(&self) -> SpinlockGuard<T>
+  pub fn lock(&self) -> SpinlockGuard<'_, T>
   {
     while self
       .lock

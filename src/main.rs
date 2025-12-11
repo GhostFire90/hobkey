@@ -2,6 +2,8 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
+extern crate alloc;
+
 mod assembly;
 mod drivers;
 mod helpers;

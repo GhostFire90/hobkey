@@ -1,11 +1,8 @@
-use core::alloc::{GlobalAlloc, Layout};
 use core::ffi::CStr;
 use core::fmt::{self, Write};
-use core::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
 
 use crate::drivers::serial::{self, Serial};
 use crate::limine_req::{FB_REQ, HHDM_REQ, MODULE_REQ};
-use crate::memory::alloc::KALLOC;
 use crate::memory::paging::{paging_flags, PageTableManager};
 use crate::memory::pmm::PMM;
 use crate::syscalls;
@@ -38,7 +35,6 @@ pub extern "C" fn kmain() -> !
 
   let fbr = FB_REQ.get_response().unwrap();
   let fb = fbr.framebuffers().next().unwrap();
-  let (width, height) = (fb.width(), fb.height());
 
   let buf_len: usize = ((fb.bpp() as u64 / 8) * fb.width() * fb.height())
     .try_into()
@@ -77,27 +73,19 @@ pub extern "C" fn kmain() -> !
   )
   .unwrap();
   serial
-    .write_fmt(format_args!("FRAME_BUFF ADDR 0x{:x}", fb_addr))
+    .write_fmt(format_args!("FRAME_BUFF ADDR 0x{:x}\n", fb_addr))
     .unwrap();
   syscalls::syscalls_initialize();
 
-  let buf_layout = Layout::from_size_align(buf_len, 8).unwrap();
-  let second_buff = unsafe { KALLOC.alloc_zeroed(buf_layout) };
-
   let _f = ustar::find_file("./test.txt", initrd_addr as *const u8, initrd_size as usize).unwrap();
-  let _txt = unsafe { CStr::from_ptr((initrd_addr as usize + _f.1) as *const i8) }
-    .to_str()
+  serial
+    .write_str(
+      unsafe { CStr::from_ptr((initrd_addr as usize + _f.1) as *const i8) }
+        .to_str()
+        .unwrap(),
+    )
     .unwrap();
 
-  let mut loop_idx = 0;
   loop
-  {
-    unsafe {
-      second_buff.write_bytes(loop_idx, buf_len);
-      loop_idx = loop_idx.wrapping_add(1);
-
-      second_buff.copy_to(fb_addr as *mut u8, buf_len);
-    }
-  }
-  unsafe { KALLOC.dealloc(second_buff.addr() as *mut u8, buf_layout) };
+  {}
 }
