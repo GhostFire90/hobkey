@@ -16,9 +16,21 @@ pub const GATE_TRAP      : u8 = 0x0F;
 pub const GATE_PRESENT   : u8 = 0x80;
 
 
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct InterruptStackFrame {
+    instruction_pointer: usize,
+    code_segment: usize,
+    flags: usize,
+    #[cfg(target_arch = "x86_64")]
+    stack_pointer: usize,
+    #[cfg(target_arch = "x86_64")]
+    stack_segment: usize,
+}
+
 
 extern "x86-interrupt" { 
-    fn empty_int(); 
+    fn empty_int(_ : InterruptStackFrame); 
 }
 
 extern "sysv64" {
@@ -45,13 +57,13 @@ impl InterruptDescriptor64{
 pub extern "sysv64" fn IDTR_init(idtr : *mut InterruptDescriptor64){
     for i in 0..256{
         unsafe {
-            idtr.add(i).write(InterruptDescriptor64::new(empty_int as u64, GATE_PRESENT | GATE_INTERRUPT))
+            idtr.add(i).write(InterruptDescriptor64::new(empty_int as *const() as u64, GATE_PRESENT | GATE_INTERRUPT))
         }
     }
 }
 
 
-pub fn set_interrupt(vector : u8, inttype : u8, callback : unsafe extern "x86-interrupt" fn() -> ()){
+pub fn set_interrupt(vector : u8, inttype : u8, callback : unsafe extern "x86-interrupt" fn(InterruptStackFrame) -> ()){
     let idtr = unsafe { get_idtr() };
     unsafe {
         idtr.add(vector as usize).write(InterruptDescriptor64::new(callback as u64, inttype));

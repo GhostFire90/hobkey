@@ -14,6 +14,7 @@ version = "0.1.0"
 dependencies = [
  "hobkey-rs-proc",
  "limine",
+ "raw_list",
 ]
 
 [[package]]
@@ -26,9 +27,9 @@ dependencies = [
 
 [[package]]
 name = "limine"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e6cb7fd182815ec1ea9e26061418ac37c3eebea47a14e773c563533f277bcef"
+checksum = "af6d2ee42712e7bd2c787365cd1dab06ef59a61becbf87bec7b32b970bd2594b"
 dependencies = [
  "bitflags",
 ]
@@ -50,6 +51,11 @@ checksum = "b5b9d34b8991d19d98081b46eacdd8eb58c6f2b201139f7c5f643cc155a633af"
 dependencies = [
  "proc-macro2",
 ]
+
+[[package]]
+name = "raw_list"
+version = "0.1.0"
+source = "git+https://github.com/GhostFire90/raw_list.git#5d3912dea9badf478f44b85114c9e6632bf7f600"
 
 [[package]]
 name = "syn"

@@ -5,12 +5,10 @@ edition = "2021"
 
 
 [workspace]
-members = [
-    "hobkey-rs-proc"
-]
-
+members = ["hobkey-rs-proc"]
 
 
 [dependencies]
-limine = "0.4.0"
-hobkey-rs-proc = {path="hobkey-rs-proc"}
+limine = "0.5.0"
+hobkey-rs-proc = { path = "hobkey-rs-proc" }
+raw_list = { git = "https://github.com/GhostFire90/raw_list.git" }
