@@ -85,6 +85,10 @@ impl MetaAlloc
   {
     self.tex.lock().heap_base = NonNull::new(base as *mut u8).unwrap();
   }
+  pub fn set_size(&self, size: usize)
+  {
+    self.tex.lock().max_size = size;
+  }
 }
 
 impl MetaAllocInner

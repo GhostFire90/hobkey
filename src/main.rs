@@ -12,7 +12,8 @@ mod kernel;
 mod limine_req;
 mod memory;
 mod spinlock;
-mod syscalls;
+pub mod syscalls;
+mod timers;
 mod ustar;
 mod utils;
 

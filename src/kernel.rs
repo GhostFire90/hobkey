@@ -1,6 +1,8 @@
 use core::ffi::CStr;
 use core::fmt::{self, Write};
 
+use alloc::vec::Vec;
+
 use crate::drivers::serial::{self, Serial};
 use crate::limine_req::{FB_REQ, HHDM_REQ, MODULE_REQ};
 use crate::memory::paging::{paging_flags, PageTableManager};
@@ -85,7 +87,8 @@ pub extern "C" fn kmain() -> !
         .unwrap(),
     )
     .unwrap();
-
+  let mut test_vec = Vec::with_capacity(buf_len);
+  test_vec.resize(buf_len, 0u8);
   loop
   {}
 }

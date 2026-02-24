@@ -2,14 +2,14 @@
 
 use super::pmm::{PhysicalAddress, PmmError, PMM};
 use super::PAGE_SIZE;
-use crate::drivers::serial::Serial;
+use crate::drivers::serial::{self, Serial, COM0};
 use crate::limine_req::{HHDM_REQ, KERNEL_REQ};
 use crate::memory::alloc::KALLOC;
 use crate::{limine_req, spinlock::*};
 use core::arch::{asm, global_asm};
 use core::fmt::Write;
 use core::ops::{RangeInclusive, Shl};
-use core::{fmt, include_str};
+use core::{fmt, include_str, usize};
 
 global_asm!(include_str!("paging.s"));
 
@@ -70,8 +70,10 @@ pub type VirtualAddress = u64;
 
 //Todo fix this cause each "thread" will most likely have their own PTM
 static PAGE_TABLE_MANAGER: Spinlock<PageTableManager> = Spinlock::new(PageTableManager::new());
+static KERNEL_MAP_TOP: Spinlock<VirtualAddress> = Spinlock::new(0);
+static KERNEL_MAP_MAX: Spinlock<VirtualAddress> = Spinlock::new(0);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PtmError
 {
   NoMapping(VirtualAddress),
@@ -149,7 +151,7 @@ impl PageTableManager
 
   fn dump_to_serial(top: PhysicalAddress)
   {
-    let mut serial = Serial::new_uninit(0x3F8);
+    let mut serial = Serial::new_uninit(COM0);
 
     fn ds_recurse(layer: VirtualAddress, serial: &mut Serial, depth: usize)
     {
@@ -215,7 +217,7 @@ impl PageTableManager
 
     let kaddr = KERNEL_REQ.get_response().unwrap();
     let kend = next_page(core::ptr::addr_of!(__KERNEL_END__) as VirtualAddress);
-    let mut serial = Serial::new_uninit(0x3F8);
+    let mut serial = Serial::new_uninit(COM0);
     fmt::write(
       &mut serial,
       format_args!("SAFE HEAP LOCATION 0x{:x}\n", kend + (3 * PAGE_SIZE)),
@@ -286,7 +288,21 @@ impl PageTableManager
         kend + PAGE_SIZE * 3
       ))
       .unwrap();
-    KALLOC.set_base(kend + PAGE_SIZE * 3);
+
+    let map_top = kend + PAGE_SIZE * 3;
+    let excess = u64::MAX - map_top;
+    serial
+      .write_fmt(format_args!("Extra size {}kb\n", excess / 1024))
+      .unwrap();
+
+    *KERNEL_MAP_TOP.lock() = map_top;
+
+    let heap_base = map_top + (excess * 3 / 4);
+    *KERNEL_MAP_MAX.lock() = map_top + (excess / 4);
+
+    KALLOC.set_base(heap_base);
+    KALLOC.set_size((u64::MAX - heap_base) as usize);
+
     Ok(())
   }
 
@@ -430,6 +446,48 @@ impl PageTableManager
         pte.set_flags(0);
       }
     }
+  }
+
+  pub fn extend_kernel_map(
+    phy_addr: PhysicalAddress,
+    flags: u64,
+  ) -> Result<VirtualAddress, PtmError>
+  {
+    let mut guard = KERNEL_MAP_TOP.lock();
+    let max = KERNEL_MAP_MAX.lock().clone();
+    let ret = *guard;
+    if Self::map(phy_addr, ret, flags) == 0
+    {
+      *guard += PAGE_SIZE;
+      if *guard == max
+      {
+        serial::Serial::new_uninit(COM0).write_str(
+          "Extend kernel map has hit its max, dont overmap!!!!! any new maps will break the heap\n",
+        ).unwrap();
+      }
+      Ok(ret)
+    }
+    else
+    {
+      Err(PtmError::UnallignedPage)
+    }
+  }
+
+  pub fn extend_kernel_map_range(
+    start: PhysicalAddress,
+    size: usize,
+    flags: u64,
+  ) -> Result<VirtualAddress, PtmError>
+  {
+    let mut guard = KERNEL_MAP_TOP.lock();
+    let ret = *guard;
+    Self::map_range(
+      start..=(start + size as u64),
+      *guard..=(*guard + size as u64),
+      flags,
+    )?;
+    *guard += size as u64;
+    Ok(ret)
   }
 
   pub fn get_physical(virt_addr: VirtualAddress) -> Result<PhysicalAddress, PtmError>

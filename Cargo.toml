@@ -12,3 +12,4 @@ members = ["hobkey-rs-proc"]
 limine = "0.5.0"
 hobkey-rs-proc = { path = "hobkey-rs-proc" }
 raw_list = { git = "https://github.com/GhostFire90/raw_list.git" }
+acpi = "6.0.1"

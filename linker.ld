@@ -33,6 +33,10 @@ SECTIONS{
         *(.bss .bss.*)
         *(COMMON)
     } :data
+
+    .inventory ALIGN (8) : {
+      KEEP(*(.inventory*))
+    } :data
     
     /* Discard .note.* and .eh_frame since they may cause issues on some hosts. */
     /DISCARD/ : {
