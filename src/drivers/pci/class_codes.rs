@@ -405,6 +405,7 @@ impl ClassCodeRegister
 
 pub mod program_interfaces
 {
+  #[derive(Clone, Debug)]
   pub enum IDEInterface
   {
     ISACompatOnly,
@@ -416,12 +417,14 @@ pub mod program_interfaces
     ISACompatBothPCIBusMastering,
     PCINativeBothISABusMastering,
   }
+  #[derive(Clone, Debug)]
   pub enum ATAInterface
   {
     SingleDMA,
     ChainedDMA,
   }
 
+  #[derive(Clone, Debug)]
   pub enum SATAInterface
   {
     VendorSpecific,
@@ -429,23 +432,27 @@ pub mod program_interfaces
     SerialStorage,
   }
 
+  #[derive(Clone, Debug)]
   pub enum SerialSCSIInterface
   {
     SAS,
     SerialStorage,
   }
+  #[derive(Clone, Debug)]
   pub enum NonVolatileMemoryInterface
   {
     NVMHCI,
     NVME,
   }
 
+  #[derive(Clone, Debug)]
   pub enum VGACompatInteface
   {
     VGA,
     Compat8514,
   }
 
+  #[derive(Clone, Debug)]
   pub enum USBInterface
   {
     UHCI,
@@ -458,12 +465,14 @@ pub mod program_interfaces
 }
 use program_interfaces::*;
 
+#[derive(Clone, Debug)]
 pub enum UnclassifiedType
 {
   NonVGA,
   VGA,
 }
 
+#[derive(Clone, Debug)]
 pub enum MassStorageType
 {
   SCSIBus,
@@ -478,6 +487,7 @@ pub enum MassStorageType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum NetworkType
 {
   Ethernet,
@@ -492,6 +502,7 @@ pub enum NetworkType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum DisplayType
 {
   VGACompatible(VGACompatInteface),
@@ -500,6 +511,7 @@ pub enum DisplayType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum MultiMediaType
 {
   Video,
@@ -509,6 +521,7 @@ pub enum MultiMediaType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum MemoryControllerType
 {
   RAM,
@@ -517,6 +530,7 @@ pub enum MemoryControllerType
 }
 
 // !TODO: Gotta add whatever the difference between subclass 4 and 9 is
+#[derive(Clone, Debug)]
 pub enum BridgeType
 {
   Host,
@@ -532,6 +546,7 @@ pub enum BridgeType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum SimpleComType
 {
   Serial,
@@ -543,6 +558,7 @@ pub enum SimpleComType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum BasePeripheralType
 {
   PIC,
@@ -555,6 +571,7 @@ pub enum BasePeripheralType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum InputDeviceType
 {
   Keyboard,
@@ -564,12 +581,14 @@ pub enum InputDeviceType
   GamePort,
   Other,
 }
+#[derive(Clone, Debug)]
 pub enum DockingStationType
 {
   Generic,
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum ProcessorType
 {
   P386,
@@ -583,6 +602,7 @@ pub enum ProcessorType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum SerialBusType
 {
   FireWire,
@@ -598,6 +618,7 @@ pub enum SerialBusType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum WirelessType
 {
   iRDACompatible,
@@ -610,6 +631,7 @@ pub enum WirelessType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum SatelliteComType
 {
   TV,
@@ -618,6 +640,7 @@ pub enum SatelliteComType
   Data,
 }
 
+#[derive(Clone, Debug)]
 pub enum EncryptionType
 {
   NetCodec,
@@ -625,6 +648,7 @@ pub enum EncryptionType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum SignalProcessingType
 {
   DPIOModules,
@@ -634,6 +658,7 @@ pub enum SignalProcessingType
   Other,
 }
 
+#[derive(Clone, Debug)]
 pub enum PciType
 {
   Unclassified(UnclassifiedType),

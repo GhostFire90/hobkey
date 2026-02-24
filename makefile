@@ -12,11 +12,13 @@ limine: iso_fs
         -efi-boot-part --efi-boot-image --protective-msdos-label \
         ${LIMINE_ROOT} -o boot.iso 1> /dev/null 2>&1
 
+
 ${LIMINE_ROOT}: ${INITRD}
 	@mkdir -p "${LIMINE_ROOT}"/EFI/BOOT
 	@mkdir -p "${LIMINE_ROOT}"/boot
 	@cp initrd.tar "${LIMINE_ROOT}"/boot/
 
+.PHONY: ${INITRD}
 ${INITRD}:
 	@tar -uf initrd.tar -C initrd -H ustar .
 iso_fs: ${LIMINE_ROOT}

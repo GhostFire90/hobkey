@@ -3,6 +3,7 @@ use core::fmt::{self, Write};
 
 use alloc::vec::Vec;
 
+use crate::drivers::pci::pci_communication::PciDevice;
 use crate::drivers::serial::{self, Serial};
 use crate::limine_req::{FB_REQ, HHDM_REQ, MODULE_REQ};
 use crate::memory::paging::{paging_flags, PageTableManager};
@@ -87,8 +88,24 @@ pub extern "C" fn kmain() -> !
         .unwrap(),
     )
     .unwrap();
-  let mut test_vec = Vec::with_capacity(buf_len);
-  test_vec.resize(buf_len, 0u8);
+
+  for bus in 0..255
+  {
+    for device in 0..32
+    {
+      let dev = PciDevice::new(bus, device, 0);
+      if dev.exists()
+      {
+        serial
+          .write_fmt(format_args!(
+            "Device at {bus}:{device}: {:?}\n",
+            dev.get_device_type()
+          ))
+          .unwrap();
+      }
+    }
+  }
+
   loop
   {}
 }
