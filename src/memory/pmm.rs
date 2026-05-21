@@ -1,11 +1,13 @@
+use core::ops::DerefMut;
 use core::ptr;
 
-use hobkey_rs_proc::preserve_temp_map;
 use limine::memory_map::EntryType;
 
 use super::paging::PageTableManager;
 use super::PAGE_SIZE;
+use crate::helpers::{get_temp_addr, map_phy_temp};
 use crate::limine_req::{HHDM_REQ, MM_REQ};
+use crate::process::CURRENT_PROC;
 use crate::spinlock::*;
 
 struct PmmNode
@@ -121,17 +123,14 @@ impl PMM
     Ok(())
   }
 
-  #[preserve_temp_map]
-  pub extern "sysv64" fn pop_page() -> PhysicalAddress
+  pub fn pop_page_with_ptm<PTM: DerefMut<Target = PageTableManager>>(
+    mut ptm: &mut Option<PTM>,
+  ) -> PhysicalAddress
   {
-    let mut guard = PHYSICAL_MEMORY_MANAGER.lock();
-    let pmm = guard.get_mut();
+    let mut pmm = PHYSICAL_MEMORY_MANAGER.lock();
+    let old_tmp = get_temp_addr(&ptm);
 
-    if pmm.available_mem == 0
-    {
-      return 0;
-    }
-    let mut head_entry = PageTableManager::map_temp(pmm.head).unwrap() as *mut PmmNode;
+    let mut head_entry = map_phy_temp(pmm.head, &mut ptm).unwrap() as *mut PmmNode;
     let mut head = unsafe { head_entry.read() };
     head.length -= PAGE_SIZE;
     let ret = pmm.head;
@@ -139,30 +138,34 @@ impl PMM
       if head.length != 0
       {
         pmm.head += PAGE_SIZE;
-        head_entry = PageTableManager::map_temp(pmm.head).unwrap() as *mut PmmNode;
+        head_entry = map_phy_temp(pmm.head, &mut ptm).unwrap() as *mut PmmNode;
         head_entry.write(head);
       }
       else
       {
         pmm.head = head_entry.read().next;
       }
-      (PageTableManager::map_temp(ret).unwrap() as *mut u8).write_bytes(0, PAGE_SIZE as usize);
+      (map_phy_temp(ret, &mut ptm).unwrap() as *mut u8).write_bytes(0, PAGE_SIZE as usize);
     };
     pmm.available_mem -= PAGE_SIZE;
 
-    return ret;
+    map_phy_temp(old_tmp, &mut ptm).unwrap();
+    ret
   }
-  #[preserve_temp_map]
-  pub extern "sysv64" fn push_page(page: PhysicalAddress)
-  {
-    let mut guard = PHYSICAL_MEMORY_MANAGER.lock();
-    let pmm = guard.get_mut();
 
-    let old_head =
-      unsafe { (PageTableManager::map_temp(pmm.head).unwrap() as *mut PmmNode).read() };
+  pub fn push_page_with_ptm<PTM: DerefMut<Target = PageTableManager>>(
+    page: PhysicalAddress,
+    ptm: PTM,
+  )
+  {
+    let mut pmm = PHYSICAL_MEMORY_MANAGER.lock();
+    let mut ptm = Some(ptm);
+    let old_tmp = get_temp_addr(&ptm);
+
+    let old_head = unsafe { (map_phy_temp(pmm.head, &mut ptm).unwrap() as *mut PmmNode).read() };
     if page + PAGE_SIZE == pmm.head
     {
-      let mapped = PageTableManager::map_temp(page).unwrap() as *mut PmmNode;
+      let mapped = map_phy_temp(page, &mut ptm).unwrap() as *mut PmmNode;
       unsafe {
         mapped.write(PmmNode {
           next: old_head.next,
@@ -173,7 +176,7 @@ impl PMM
     }
     else if pmm.head + old_head.length == page
     {
-      let mapped = PageTableManager::map_temp(pmm.head).unwrap() as *mut PmmNode;
+      let mapped = map_phy_temp(pmm.head, &mut ptm).unwrap() as *mut PmmNode;
       unsafe {
         mapped.write(PmmNode {
           next: old_head.next,
@@ -183,7 +186,7 @@ impl PMM
     }
     else
     {
-      let new_head = PageTableManager::map_temp(page).unwrap() as *mut PmmNode;
+      let new_head = map_phy_temp(page, &mut ptm).unwrap() as *mut PmmNode;
       unsafe {
         new_head.write(PmmNode {
           next: pmm.head,
@@ -193,6 +196,89 @@ impl PMM
       pmm.head = page;
     }
     pmm.available_mem += PAGE_SIZE;
+    map_phy_temp(old_tmp, &mut ptm).unwrap();
+  }
+
+  pub extern "sysv64" fn pop_page() -> PhysicalAddress
+  {
+    let mut pmm_guard = PHYSICAL_MEMORY_MANAGER.lock();
+    let pmm = pmm_guard.get_mut();
+
+    if pmm.available_mem == 0
+    {
+      return 0;
+    }
+    let mut proc_guard = CURRENT_PROC.lock();
+    let mut ptm = proc_guard.as_mut().and_then(|x| Some(x.ptm.lock()));
+    let old_tmp = get_temp_addr(&ptm);
+
+    let mut head_entry = map_phy_temp(pmm.head, &mut ptm).unwrap() as *mut PmmNode;
+    let mut head = unsafe { head_entry.read() };
+    head.length -= PAGE_SIZE;
+    let ret = pmm.head;
+    unsafe {
+      if head.length != 0
+      {
+        pmm.head += PAGE_SIZE;
+        head_entry = map_phy_temp(pmm.head, &mut ptm).unwrap() as *mut PmmNode;
+        head_entry.write(head);
+      }
+      else
+      {
+        pmm.head = head_entry.read().next;
+      }
+      (map_phy_temp(ret, &mut ptm).unwrap() as *mut u8).write_bytes(0, PAGE_SIZE as usize);
+    };
+    pmm.available_mem -= PAGE_SIZE;
+
+    map_phy_temp(old_tmp, &mut ptm).unwrap();
+
+    return ret;
+  }
+  pub extern "sysv64" fn push_page(page: PhysicalAddress)
+  {
+    let mut guard = PHYSICAL_MEMORY_MANAGER.lock();
+    let pmm = guard.get_mut();
+
+    let mut proc_guard = CURRENT_PROC.lock();
+    let mut ptm = proc_guard.as_mut().and_then(|x| Some(x.ptm.lock()));
+    let old_tmp = get_temp_addr(&ptm);
+
+    let old_head = unsafe { (map_phy_temp(pmm.head, &mut ptm).unwrap() as *mut PmmNode).read() };
+    if page + PAGE_SIZE == pmm.head
+    {
+      let mapped = map_phy_temp(page, &mut ptm).unwrap() as *mut PmmNode;
+      unsafe {
+        mapped.write(PmmNode {
+          next: old_head.next,
+          length: old_head.length + PAGE_SIZE,
+        });
+      };
+      pmm.head = page;
+    }
+    else if pmm.head + old_head.length == page
+    {
+      let mapped = map_phy_temp(pmm.head, &mut ptm).unwrap() as *mut PmmNode;
+      unsafe {
+        mapped.write(PmmNode {
+          next: old_head.next,
+          length: old_head.length + PAGE_SIZE,
+        });
+      };
+    }
+    else
+    {
+      let new_head = map_phy_temp(page, &mut ptm).unwrap() as *mut PmmNode;
+      unsafe {
+        new_head.write(PmmNode {
+          next: pmm.head,
+          length: PAGE_SIZE,
+        });
+      };
+      pmm.head = page;
+    }
+    pmm.available_mem += PAGE_SIZE;
+    map_phy_temp(old_tmp, &mut ptm).unwrap();
   }
 
   #[allow(dead_code)]

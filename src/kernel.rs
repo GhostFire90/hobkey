@@ -8,6 +8,8 @@ use crate::drivers::serial::{self, Serial};
 use crate::limine_req::{FB_REQ, HHDM_REQ, MODULE_REQ};
 use crate::memory::paging::{paging_flags, PageTableManager};
 use crate::memory::pmm::PMM;
+use crate::process::{Process, CURRENT_PROC};
+use crate::spinlock::Spinlock;
 use crate::syscalls;
 use crate::ustar;
 
@@ -62,19 +64,28 @@ pub extern "C" fn kmain() -> !
 
   PMM::init();
   PMM::reclaim_bootloader().unwrap();
-  PageTableManager::init().unwrap();
-  PageTableManager::map_range(
-    initrd_phy..=initrd_phy + initrd_size,
-    initrd_addr..=initrd_addr + initrd_size,
-    paging_flags::PAGING_PRESENT | paging_flags::PAGING_R,
-  )
-  .unwrap();
-  PageTableManager::map_range(
-    fb_phy..=fb_phy + buf_len as u64,
-    fb_addr..=fb_addr + buf_len as u64,
-    paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
-  )
-  .unwrap();
+  let ptm = PageTableManager::new_bootstrap().unwrap();
+  let kernel_proc = Process::new(ptm);
+  let mut proc_guard = CURRENT_PROC.lock();
+  proc_guard.replace(kernel_proc);
+  let proc = proc_guard.as_mut().unwrap();
+
+  proc
+    .ptm_operation(|ptm| {
+      ptm
+        .map_range(
+          initrd_phy..=initrd_phy + initrd_size,
+          initrd_addr..=initrd_addr + initrd_size,
+          paging_flags::PAGING_PRESENT | paging_flags::PAGING_R,
+        )
+        .and(ptm.map_range(
+          fb_phy..=fb_phy + buf_len as u64,
+          fb_addr..=fb_addr + buf_len as u64,
+          paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
+        ))
+    })
+    .unwrap();
+
   serial
     .write_fmt(format_args!("FRAME_BUFF ADDR 0x{:x}\n", fb_addr))
     .unwrap();

@@ -11,6 +11,7 @@ mod idt;
 mod kernel;
 mod limine_req;
 mod memory;
+mod process;
 mod spinlock;
 pub mod syscalls;
 mod timers;

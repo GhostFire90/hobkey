@@ -3,12 +3,15 @@
 use super::pmm::{PhysicalAddress, PmmError, PMM};
 use super::PAGE_SIZE;
 use crate::drivers::serial::{self, Serial, COM0};
+use crate::helpers::map_phy_temp;
 use crate::limine_req::{HHDM_REQ, KERNEL_REQ};
 use crate::memory::alloc::KALLOC;
+use crate::process::CURRENT_PROC;
 use crate::{limine_req, spinlock::*};
 use core::arch::{asm, global_asm};
 use core::fmt::Write;
-use core::ops::{RangeInclusive, Shl};
+use core::ops::{DerefMut, RangeInclusive, Shl};
+use core::sync::atomic::AtomicBool;
 use core::{fmt, include_str, usize};
 
 global_asm!(include_str!("paging.s"));
@@ -40,6 +43,7 @@ extern "C" {
 #[repr(transparent)]
 struct TableEntry(u64);
 
+#[repr(usize)]
 pub enum TableLayer
 {
   PML4,
@@ -64,14 +68,11 @@ pub struct PageTableManager
   phy_addr: PhysicalAddress,
   tmp_address: VirtualAddress,
   tmp_entry_address: VirtualAddress,
-  ready: bool,
 }
 pub type VirtualAddress = u64;
 
-//Todo fix this cause each "thread" will most likely have their own PTM
-static PAGE_TABLE_MANAGER: Spinlock<PageTableManager> = Spinlock::new(PageTableManager::new());
-static KERNEL_MAP_TOP: Spinlock<VirtualAddress> = Spinlock::new(0);
-static KERNEL_MAP_MAX: Spinlock<VirtualAddress> = Spinlock::new(0);
+static PAGE_TABLE_MANAGER: Spinlock<Option<PageTableManager>> = Spinlock::new(None);
+pub static USE_HHDM: AtomicBool = AtomicBool::new(true);
 
 #[derive(Debug, Clone)]
 pub enum PtmError
@@ -81,6 +82,7 @@ pub enum PtmError
   IncorrectPageSize,
   UnallignedPage,
   PmmError(PmmError),
+  PtmNotReady,
 }
 
 fn split_virtual(virt: VirtualAddress) -> ([u16; 4], u16)
@@ -96,13 +98,11 @@ fn split_virtual(virt: VirtualAddress) -> ([u16; 4], u16)
   )
 }
 
-fn next_page(mut addr: u64) -> u64
+fn next_page(addr: u64) -> u64
 {
-  if addr % PAGE_SIZE != 0
-  {
-    addr += PAGE_SIZE - (addr % PAGE_SIZE);
-  }
-  addr
+  // if addr is not the start of a page, go to next multiple of PAGE_SIZE
+  // otherwise set next multiple
+  addr.next_multiple_of(PAGE_SIZE)
 }
 
 fn sign_extend(i: VirtualAddress) -> VirtualAddress
@@ -139,128 +139,116 @@ fn from_indexes(indexes: ([u16; 4], u16)) -> VirtualAddress
 
 impl PageTableManager
 {
-  pub(self) const fn new() -> Self
-  {
-    PageTableManager {
-      phy_addr: 0,
-      tmp_address: 0,
-      tmp_entry_address: 0,
-      ready: false,
-    }
-  }
+  // fn dump_to_serial(&mut self, top: PhysicalAddress)
+  // {
+  //   let mut serial = Serial::new_uninit(COM0);
 
-  fn dump_to_serial(top: PhysicalAddress)
-  {
-    let mut serial = Serial::new_uninit(COM0);
+  //   fn ds_recurse(
+  //     ptm: &mut PageTableManager,
+  //     layer: VirtualAddress,
+  //     serial: &mut Serial,
+  //     depth: usize,
+  //   )
+  //   {
+  //     if layer == 0
+  //     {
+  //       return;
+  //     }
+  //     let entries = layer as *mut TableEntry;
+  //     serial.write(b'[');
+  //     let mut previous = false;
+  //     for i in 0..512
+  //     {
+  //       let entry = unsafe { entries.add(i).read() };
+  //       match entry.get_pointer()
+  //       {
+  //         0 => continue,
+  //         x =>
+  //         {
+  //           if previous
+  //           {
+  //             serial.write(b',');
+  //           }
+  //           serial.write(b'{');
+  //           let old_tmp = ptm.get_temp();
+  //           let next = PageTableManager::map_temp(x).unwrap_or(0);
+  //           fmt::write(
+  //             serial,
+  //             format_args!(
+  //               "\"flags\":{},\"address\":\"{:x}\",\"depth\":{}",
+  //               entry.get_flags(),
+  //               entry.get_pointer(),
+  //               depth
+  //             ),
+  //           )
+  //           .unwrap();
+  //           if depth != TableLayer::PT.into()
+  //           {
+  //             fmt::write(serial, format_args!(",\"layer\":")).unwrap();
+  //             ds_recurse(ptm, next, serial, depth + 1);
+  //           }
+  //           PageTableManager::map_temp(old_tmp).unwrap();
+  //           serial.write(b'}');
+  //           previous = true;
+  //         }
+  //       }
+  //     }
+  //     serial.write(b']');
+  //   }
+  //   let old_tmp = self.get_temp();
+  //   let next = self.map_temp(top).unwrap_or(0);
+  //   ds_recurse(self, next, &mut serial, 0);
+  //   serial.write(b'\n');
+  //   Self::map_temp(old_tmp).unwrap();
+  // }
 
-    fn ds_recurse(layer: VirtualAddress, serial: &mut Serial, depth: usize)
-    {
-      if layer == 0
-      {
-        return;
-      }
-      let entries = layer as *mut TableEntry;
-      serial.write(b'[');
-      let mut previous = false;
-      for i in 0..512
-      {
-        let entry = unsafe { entries.add(i).read() };
-        match entry.get_pointer()
-        {
-          0 => continue,
-          x =>
-          {
-            if previous
-            {
-              serial.write(b',');
-            }
-            serial.write(b'{');
-            let old_tmp = PageTableManager::get_temp();
-            let next = PageTableManager::map_temp(x).unwrap_or(0);
-            fmt::write(
-              serial,
-              format_args!(
-                "\"flags\":{},\"address\":\"{:x}\",\"depth\":{}",
-                entry.get_flags(),
-                entry.get_pointer(),
-                depth
-              ),
-            )
-            .unwrap();
-            if depth != TableLayer::PT.into()
-            {
-              fmt::write(serial, format_args!(",\"layer\":")).unwrap();
-              ds_recurse(next, serial, depth + 1);
-            }
-            PageTableManager::map_temp(old_tmp).unwrap();
-            serial.write(b'}');
-            previous = true;
-          }
-        }
-      }
-      serial.write(b']');
-    }
-    let old_tmp = PageTableManager::get_temp();
-    let next = PageTableManager::map_temp(top).unwrap_or(0);
-    ds_recurse(next, &mut serial, 0);
-    serial.write(b'\n');
-    PageTableManager::map_temp(old_tmp).unwrap();
-  }
-
-  pub fn init() -> Result<(), PtmError>
+  pub(crate) fn new_bootstrap() -> Result<Self, PtmError>
   {
     let pg = PMM::pop_page();
-    let mut guard = PAGE_TABLE_MANAGER.lock();
-    let ptm = guard.get_mut();
-    ptm.phy_addr = pg;
-    drop(guard);
 
+    let phy_addr = pg;
+
+    // Get Address of the kernel in memory
     let kaddr = KERNEL_REQ.get_response().unwrap();
+
+    // Get the next closest page after the end of the kernel to make sure we dont truncate the kernel
     let kend = next_page(core::ptr::addr_of!(__KERNEL_END__) as VirtualAddress);
-    let mut serial = Serial::new_uninit(COM0);
-    fmt::write(
-      &mut serial,
-      format_args!("SAFE HEAP LOCATION 0x{:x}\n", kend + (3 * PAGE_SIZE)),
-    )
-    .unwrap();
 
-    serial
-      .write_fmt(format_args!("MAX VIRT_BIT {}\n", unsafe { MAX_VRT_BIT }))
-      .unwrap();
+    // this is the address that will be given to the user when they call map_temp
+    let tmp_space = kend + PAGE_SIZE;
 
+    let tmp_page = tmp_space + PAGE_SIZE;
+
+    let tmp_space_idx = split_virtual(tmp_space).0[3];
+    let tmp_address = tmp_space;
+    let tmp_entry_address = tmp_page + (tmp_space_idx as usize * size_of::<TableEntry>()) as u64;
+
+    let mut ptm = Self {
+      phy_addr,
+      tmp_address,
+      tmp_entry_address,
+    };
+
+    // The kernels virtual and physical addresses
     let curr = kaddr.virtual_base();
     let curr_phy = kaddr.physical_base();
 
+    // kend is in virtual space so make sure to get difference between it and the virtual
     let klen = kend - curr;
-    Self::map_range(
+    ptm.map_range(
       curr_phy..=curr_phy + klen,
       curr..=curr + klen,
       paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
     )?;
 
-    // this is the address that will be given to the user when they call map_temp
-    let tmp_space = kend + PAGE_SIZE;
-    let _test = Self::crawl_alloc(
-      tmp_space,
-      TableLayer::PT,
-      paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
-    );
-    unsafe {
-      let mut t = _test.read();
-      t.set_pointer(0xdeadbeef);
-      t.set_flags(0);
-      _test.write(t);
-    }
-    let tmp_space_pdt = Self::crawl(tmp_space, TableLayer::PDT)?;
+    let tmp_space_pdt = ptm.crawl(tmp_space, TableLayer::PDT)?;
 
     // which means we need to make it modifiable without re-mapping or else we get crazy infinite recurrsion
     // we will use the next virtual page to map to the tmp space
 
     let _hhdm_offs = limine_req::HHDM_REQ.get_response().unwrap().offset();
-    let tmp_space_idx = split_virtual(tmp_space).0[3];
 
-    let tmp_page = tmp_space + PAGE_SIZE;
-    let ptmp_page_entry = Self::crawl_alloc(
+    let ptmp_page_entry = ptm.crawl_alloc(
       tmp_page,
       TableLayer::PT,
       paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
@@ -273,41 +261,44 @@ impl PageTableManager
       ptmp_page_entry.write(tmp_page_entry);
     }
 
-    Self::dump_to_serial(pg);
+    // ptm.dump_to_serial(pg);
 
-    let mut guard = PAGE_TABLE_MANAGER.lock();
-    let ptm = guard.get_mut();
-    ptm.tmp_address = tmp_space;
-    ptm.tmp_entry_address = tmp_page + (tmp_space_idx as usize * size_of::<TableEntry>()) as u64;
-    ptm.ready = true;
+    set_cr3(phy_addr);
 
-    set_cr3(ptm.phy_addr);
-    serial
-      .write_fmt(format_args!(
-        "HEAP_LOCATION : 0x{:x}\n",
-        kend + PAGE_SIZE * 3
-      ))
-      .unwrap();
-
-    let map_top = kend + PAGE_SIZE * 3;
-    let excess = u64::MAX - map_top;
-    serial
-      .write_fmt(format_args!("Extra size {}kb\n", excess / 1024))
-      .unwrap();
-
-    *KERNEL_MAP_TOP.lock() = map_top;
-
-    let heap_base = map_top + (excess * 3 / 4);
-    *KERNEL_MAP_MAX.lock() = map_top + (excess / 4);
+    let heap_base = tmp_page + PAGE_SIZE;
 
     KALLOC.set_base(heap_base);
     KALLOC.set_size((u64::MAX - heap_base) as usize);
 
+    USE_HHDM.store(false, core::sync::atomic::Ordering::Release);
+
+    Ok(ptm)
+  }
+
+  pub fn map(
+    &mut self,
+    phy_addr: PhysicalAddress,
+    virt_addr: VirtualAddress,
+    flags: u64,
+  ) -> Result<(), PtmError>
+  {
+    let pentry = self.crawl_alloc(virt_addr, TableLayer::PT, flags);
+    let mut entry = unsafe { pentry.read() };
+    entry.set_pointer(phy_addr);
+    entry.set_flags(flags);
+
+    unsafe {
+      invalidate_page(virt_addr);
+      pentry.write(entry);
+    };
     Ok(())
   }
 
-  pub extern "sysv64" fn map(phy_addr: PhysicalAddress, virt_addr: VirtualAddress, flags: u64)
-    -> i8
+  pub extern "sysv64" fn map_interrupt(
+    phy_addr: PhysicalAddress,
+    virt_addr: VirtualAddress,
+    flags: u64,
+  ) -> i8
   {
     if phy_addr % PAGE_SIZE != 0
     {
@@ -317,43 +308,46 @@ impl PageTableManager
     {
       // let mut guard = PAGE_TABLE_MANAGER.lock();
       // let ptm = guard.get_mut();
-      let pentry = PageTableManager::crawl_alloc(virt_addr, TableLayer::PT, flags);
-      let mut entry = unsafe { pentry.read() };
-      entry.set_pointer(phy_addr);
-      entry.set_flags(flags);
+      let mut guard = CURRENT_PROC.lock();
+      let proc = guard.as_mut().unwrap();
 
-      unsafe {
-        invalidate_page(virt_addr);
-        pentry.write(entry);
-      };
+      proc
+        .ptm_operation(|ptm| ptm.map(phy_addr, virt_addr, flags))
+        .unwrap();
       0
     }
   }
 
-  pub extern "sysv64" fn unmap(virt_addr: VirtualAddress, free_phy: bool) -> i8
+  pub fn unmap(&mut self, virt_addr: VirtualAddress, free_phy: bool) -> Result<(), PtmError>
   {
-    if virt_addr % PAGE_SIZE != 0
-    {
-      return -1;
-    }
-
-    let r_entry = PageTableManager::crawl(virt_addr, TableLayer::PT);
-    if let Ok(entry) = r_entry
-    {
-      unsafe {
+    self
+      .crawl(virt_addr, TableLayer::PT)
+      .and_then(|entry| unsafe {
         let ret = (*entry).get_pointer();
         (*entry).set_flags(0);
         if free_phy
         {
           PMM::push_page(ret);
         }
-        0
-      }
-    }
-    else
+        Ok(())
+      })
+  }
+
+  pub extern "sysv64" fn unmap_interrupt(virt_addr: VirtualAddress, free_phy: bool) -> i8
+  {
+    if virt_addr % PAGE_SIZE != 0
     {
-      -1
+      return -1;
     }
+
+    let mut guard = CURRENT_PROC.lock();
+    let proc = guard.as_mut().unwrap();
+
+    proc
+      .ptm_operation(|ptm| ptm.unmap(virt_addr, free_phy))
+      .map(|_| 0)
+      .map_err(|_| -1)
+      .unwrap()
   }
 
   pub fn unmap_range(virt: RangeInclusive<VirtualAddress>, free_phy: bool) -> Result<(), PtmError>
@@ -368,7 +362,7 @@ impl PageTableManager
     }
     for pg in virt.step_by(PAGE_SIZE as usize)
     {
-      if Self::unmap(pg, free_phy) == -1
+      if Self::unmap_interrupt(pg, free_phy) == -1
       {
         return Err(PtmError::NoMapping(pg));
       }
@@ -377,6 +371,7 @@ impl PageTableManager
   }
 
   pub fn map_range(
+    &mut self,
     phy: RangeInclusive<PhysicalAddress>,
     virt: RangeInclusive<VirtualAddress>,
     flags: u64,
@@ -400,107 +395,89 @@ impl PageTableManager
       let vi = virt.step_by(PAGE_SIZE as usize);
       for (p, v) in pi.zip(vi)
       {
-        if PageTableManager::map(p, v, flags) == -1
-        {
-          return Err(PtmError::UnallignedPage);
-        }
+        self.map(p, v, flags)?;
       }
       Ok(())
     }
   }
-
-  pub fn map_temp(phy_addr: PhysicalAddress) -> Result<VirtualAddress, PtmError>
+  pub fn map_temp(&mut self, phy_addr: PhysicalAddress) -> Result<VirtualAddress, PtmError>
   {
-    let guard = PAGE_TABLE_MANAGER.lock();
-    if !guard.get().ready
+    if USE_HHDM.load(core::sync::atomic::Ordering::Acquire)
     {
-      let offset = HHDM_REQ.get_response().unwrap().offset();
-      Ok(phy_addr + offset)
+      let hhdm = HHDM_REQ.get_response().unwrap().offset();
+      Serial::new_uninit(COM0)
+        .write_fmt(format_args!("0x{phy_addr:x} + 0x{hhdm:x}\n"))
+        .unwrap();
+      return Ok(phy_addr + hhdm);
     }
-    else
-    {
-      let ret = guard.get().tmp_address;
-      let ppte = guard.get().tmp_entry_address as *mut TableEntry;
-      drop(guard);
 
-      unsafe {
-        let mut pte = ppte.read();
-        pte.set_pointer(phy_addr);
-        pte.set_flags(paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT);
-        ppte.write(pte);
-        invalidate_page(ret);
-      }
-      Ok(ret)
+    let ret = self.tmp_address;
+    let ppte = self.tmp_entry_address as *mut TableEntry;
+
+    unsafe {
+      let mut pte = ppte.read();
+      pte.set_pointer(phy_addr);
+      pte.set_flags(paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT);
+      ppte.write(pte);
+      invalidate_page(ret);
     }
+    Ok(ret)
   }
+  // pub fn map_temp_old(phy_addr: PhysicalAddress) -> Result<VirtualAddress, PtmError>
+  // {
+  //   let mut guard = CURRENT_PROC.lock();
+
+  //   if let Some(proc) = guard.as_mut()
+  //   {
+  //     if !proc.has_ptm()
+  //     {
+  //       let offset = HHDM_REQ.get_response().unwrap().offset();
+  //       Ok(phy_addr + offset)
+  //     }
+  //     else
+  //     {
+  //       proc.ptm_operation(move |ptm| {
+  //         let ret = ptm.tmp_address;
+  //         let ppte = ptm.tmp_entry_address as *mut TableEntry;
+
+  //         unsafe {
+  //           let mut pte = ppte.read();
+  //           pte.set_pointer(phy_addr);
+  //           pte.set_flags(paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT);
+  //           ppte.write(pte);
+  //           invalidate_page(ret);
+  //         }
+  //         Ok(ret)
+  //       })
+  //     }
+  //   }
+  //   else
+  //   {
+  //     let offset = HHDM_REQ.get_response().unwrap().offset();
+  //     Ok(phy_addr + offset)
+  //   }
+  // }
   pub fn unmap_temp()
   {
-    let mut guard = PAGE_TABLE_MANAGER.lock();
-    let ptm = guard.get_mut();
-    if ptm.ready
-    {
+    let mut guard = CURRENT_PROC.lock();
+    let proc = guard.as_mut().unwrap();
+    let _ = proc.ptm_operation(|ptm| {
       let ppte = ptm.tmp_entry_address as *mut TableEntry;
       unsafe {
         let mut pte = ppte.read();
         pte.set_pointer(0);
         pte.set_flags(0);
       }
-    }
-  }
-
-  pub fn extend_kernel_map(
-    phy_addr: PhysicalAddress,
-    flags: u64,
-  ) -> Result<VirtualAddress, PtmError>
-  {
-    let mut guard = KERNEL_MAP_TOP.lock();
-    let max = KERNEL_MAP_MAX.lock().clone();
-    let ret = *guard;
-    if Self::map(phy_addr, ret, flags) == 0
-    {
-      *guard += PAGE_SIZE;
-      if *guard == max
-      {
-        serial::Serial::new_uninit(COM0).write_str(
-          "Extend kernel map has hit its max, dont overmap!!!!! any new maps will break the heap\n",
-        ).unwrap();
-      }
-      Ok(ret)
-    }
-    else
-    {
-      Err(PtmError::UnallignedPage)
-    }
-  }
-
-  pub fn extend_kernel_map_range(
-    start: PhysicalAddress,
-    size: usize,
-    flags: u64,
-  ) -> Result<VirtualAddress, PtmError>
-  {
-    let mut guard = KERNEL_MAP_TOP.lock();
-    let ret = *guard;
-    Self::map_range(
-      start..=(start + size as u64),
-      *guard..=(*guard + size as u64),
-      flags,
-    )?;
-    *guard += size as u64;
-    Ok(ret)
+      Ok(())
+    });
   }
 
   pub fn get_physical(virt_addr: VirtualAddress) -> Result<PhysicalAddress, PtmError>
   {
-    if !PAGE_TABLE_MANAGER.lock().get().ready
-    {
-      let offset = HHDM_REQ.get_response().unwrap().offset();
-
-      Ok(virt_addr - offset)
-    }
-    else
-    {
-      let res = Self::crawl(virt_addr, TableLayer::PT);
+    let mut guard = CURRENT_PROC.lock();
+    let proc = guard.as_mut().unwrap();
+    let op = |ptm: &mut PageTableManager| {
+      let res = ptm.crawl(virt_addr, TableLayer::PT);
       match res
       {
         Ok(x) =>
@@ -510,26 +487,43 @@ impl PageTableManager
         }
         Err(e) => Err(e),
       }
+    };
+
+    match proc.ptm_operation(op)
+    {
+      Err(PtmError::PtmNotReady) =>
+      {
+        let offset = HHDM_REQ.get_response().unwrap().offset();
+
+        Ok(virt_addr - offset)
+      }
+      e => e,
     }
   }
-  pub fn get_temp() -> PhysicalAddress
+  pub fn get_temp(&self) -> PhysicalAddress
   {
-    if !PAGE_TABLE_MANAGER.lock().get().ready
+    if USE_HHDM.load(core::sync::atomic::Ordering::Acquire)
     {
       0
     }
     else
     {
-      let tmp = PAGE_TABLE_MANAGER.lock().get().tmp_entry_address as *const TableEntry;
+      let tmp = self.tmp_entry_address as *const TableEntry;
       unsafe { tmp.read().get_pointer() }
     }
   }
 
-  pub(self) fn crawl(virt: VirtualAddress, layer: TableLayer) -> Result<*mut TableEntry, PtmError>
+  pub(self) fn crawl(
+    &mut self,
+    virt: VirtualAddress,
+    layer: TableLayer,
+  ) -> Result<*mut TableEntry, PtmError>
   {
     let (indexes, _) = split_virtual(virt);
-    let phy_addr = PAGE_TABLE_MANAGER.lock().get().phy_addr;
-    let mut ret = PageTableManager::map_temp(phy_addr)? as *mut TableEntry;
+    let phy_addr = self.phy_addr;
+    let mut o_ptm = Some(self);
+
+    let mut ret = map_phy_temp(phy_addr, &mut o_ptm)? as *mut TableEntry;
     let l: usize = layer.into();
 
     for i in 0..l
@@ -540,29 +534,32 @@ impl PageTableManager
       {
         return Err(PtmError::NoMapping(virt));
       }
-      ret = PageTableManager::map_temp(phy)? as *mut TableEntry;
+      ret = map_phy_temp(phy, &mut o_ptm)? as *mut TableEntry;
     }
     Ok(unsafe { ret.add(indexes[l].into()) })
   }
 
   pub(self) fn crawl_alloc(
+    &mut self,
     virt: VirtualAddress,
     table_layer: TableLayer,
     flags: u64,
   ) -> *mut TableEntry
   {
     let (indexes, _) = split_virtual(virt);
-    let phy_addr = PAGE_TABLE_MANAGER.lock().get().phy_addr;
+    let phy_addr = self.phy_addr;
 
-    let mut ret = PageTableManager::map_temp(phy_addr).unwrap() as *mut TableEntry;
+    let mut o_ptm = Some(self);
+
+    let mut ret = map_phy_temp(phy_addr, &mut o_ptm).unwrap() as *mut TableEntry;
     let l: usize = table_layer.into();
 
     for i in 0..l
     {
       let mut entry = unsafe { ret.add(indexes[i] as usize).read() };
-      entry.check_and_alloc(flags);
+      entry.check_and_alloc(flags, &mut o_ptm);
       unsafe { ret.add(indexes[i] as usize).write(entry) }
-      ret = PageTableManager::map_temp(entry.get_pointer()).unwrap() as *mut TableEntry;
+      ret = map_phy_temp(entry.get_pointer(), &mut o_ptm).unwrap() as *mut TableEntry;
     }
     unsafe { ret.add(indexes[l].into()) }
   }
@@ -615,7 +612,7 @@ impl TableEntry
 
 impl TableEntry
 {
-  pub fn check_and_alloc(&mut self, flags: u64)
+  pub fn check_and_alloc(&mut self, flags: u64, ptm: &mut Option<&mut PageTableManager>)
   {
     let present = (self.0 & paging_flags::PAGING_PRESENT) != 0;
     if present
@@ -624,7 +621,8 @@ impl TableEntry
     }
     else
     {
-      let page = PMM::pop_page();
+      let page = PMM::pop_page_with_ptm(ptm);
+
       self.set_pointer(page);
       self.set_flags(flags);
     }
