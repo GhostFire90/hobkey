@@ -2,15 +2,19 @@
 
 use super::pmm::{PhysicalAddress, PmmError, PMM};
 use super::PAGE_SIZE;
-use crate::drivers::serial::{self, Serial, COM0};
+use crate::drivers::serial::{Serial, COM0};
 use crate::helpers::map_phy_temp;
 use crate::limine_req::{HHDM_REQ, KERNEL_REQ};
 use crate::memory::alloc::KALLOC;
+use crate::memory::mmap::MmapTracker;
+use crate::memory::{get_containing_page, MemoryRange, HHDM_OFFSET};
 use crate::process::CURRENT_PROC;
 use crate::{limine_req, spinlock::*};
 use core::arch::{asm, global_asm};
+use core::cell::LazyCell;
 use core::fmt::Write;
-use core::ops::{DerefMut, RangeInclusive, Shl};
+use core::mem::MaybeUninit;
+use core::ops::{BitXor, Range, RangeInclusive, Shl};
 use core::sync::atomic::AtomicBool;
 use core::{fmt, include_str, usize};
 
@@ -31,6 +35,8 @@ fn set_cr3(pml4: PhysicalAddress)
 }
 
 const TABLE_ENTRY_COUNT: usize = 512;
+
+const HIGHER_HALF_ADDR: VirtualAddress = VirtualAddress::MAX ^ ((1 << 47) - 1);
 
 extern "C" {
   static MAX_PHY_BIT: u8;
@@ -54,21 +60,43 @@ pub enum TableLayer
 
 pub mod paging_flags
 {
-  pub const PAGING_PRESENT: u64 = 1 << 0; // Present; must be 1 to reference a paging table
-  pub const PAGING_RW: u64 = 1 << 1; // Read/write; if 0, writes may not be allowed (see Section 4.6)
-  pub const PAGING_USER: u64 = 1 << 2; // User/supervisor; if 0, user-mode accesses are not allowed (see Section 4.6)
-  pub const PAGING_PWT: u64 = 1 << 3; // Page-level write-through; indirectly determines memory type (see Section 4.9.2)
-  pub const PAGING_PCD: u64 = 1 << 4; // Page-level cache disable; indirectly determines memory type (see Section 4.9.2)
-  pub const PAGING_ACCESSED: u64 = 1 << 5; // Accessed; indicates whether this entry has been used (see Section 4.8)
-  pub const PAGING_R: u64 = 1 << 11; // For ordinary paging, ignored; for HLAT paging, restart (see Section 4.8)
+
+  /// Present; must be 1 to reference a paging table
+  pub const PAGING_PRESENT: u64 = 1 << 0;
+
+  /// Read/write; if 0, writes may not be allowed (see Section 4.6)
+  pub const PAGING_RW: u64 = 1 << 1;
+
+  /// User/supervisor; if 0, user-mode accesses are not allowed (see Section 4.6)
+  pub const PAGING_USER: u64 = 1 << 2;
+
+  /// Page-level write-through; indirectly determines memory type (see Section 4.9.2)
+  pub const PAGING_PWT: u64 = 1 << 3;
+
+  /// Page-level cache disable; indirectly determines memory type (see Section 4.9.2)
+  pub const PAGING_PCD: u64 = 1 << 4;
+
+  /// Accessed; indicates whether this entry has been used (see Section 4.8)
+  pub const PAGING_ACCESSED: u64 = 1 << 5;
+
+  /// For ordinary paging, ignored; for HLAT paging, restart (see Section 4.8)
+  pub const PAGING_R: u64 = 1 << 11;
 }
+
+/// TODO, probably need to fix this lmao
+const KERNEL_START: VirtualAddress = 0xffffffff80000000;
 
 pub struct PageTableManager
 {
   phy_addr: PhysicalAddress,
   tmp_address: VirtualAddress,
   tmp_entry_address: VirtualAddress,
+
+  pub mmap_start: VirtualAddress,
+  pub mmap_end: VirtualAddress,
+  pub mmap_tracker: Spinlock<Option<MmapTracker>>,
 }
+
 pub type VirtualAddress = u64;
 
 static PAGE_TABLE_MANAGER: Spinlock<Option<PageTableManager>> = Spinlock::new(None);
@@ -139,71 +167,76 @@ fn from_indexes(indexes: ([u16; 4], u16)) -> VirtualAddress
 
 impl PageTableManager
 {
-  // fn dump_to_serial(&mut self, top: PhysicalAddress)
-  // {
-  //   let mut serial = Serial::new_uninit(COM0);
+  fn dump_to_serial(&mut self, top: PhysicalAddress)
+  {
+    let mut serial = Serial::new_uninit(COM0);
 
-  //   fn ds_recurse(
-  //     ptm: &mut PageTableManager,
-  //     layer: VirtualAddress,
-  //     serial: &mut Serial,
-  //     depth: usize,
-  //   )
-  //   {
-  //     if layer == 0
-  //     {
-  //       return;
-  //     }
-  //     let entries = layer as *mut TableEntry;
-  //     serial.write(b'[');
-  //     let mut previous = false;
-  //     for i in 0..512
-  //     {
-  //       let entry = unsafe { entries.add(i).read() };
-  //       match entry.get_pointer()
-  //       {
-  //         0 => continue,
-  //         x =>
-  //         {
-  //           if previous
-  //           {
-  //             serial.write(b',');
-  //           }
-  //           serial.write(b'{');
-  //           let old_tmp = ptm.get_temp();
-  //           let next = PageTableManager::map_temp(x).unwrap_or(0);
-  //           fmt::write(
-  //             serial,
-  //             format_args!(
-  //               "\"flags\":{},\"address\":\"{:x}\",\"depth\":{}",
-  //               entry.get_flags(),
-  //               entry.get_pointer(),
-  //               depth
-  //             ),
-  //           )
-  //           .unwrap();
-  //           if depth != TableLayer::PT.into()
-  //           {
-  //             fmt::write(serial, format_args!(",\"layer\":")).unwrap();
-  //             ds_recurse(ptm, next, serial, depth + 1);
-  //           }
-  //           PageTableManager::map_temp(old_tmp).unwrap();
-  //           serial.write(b'}');
-  //           previous = true;
-  //         }
-  //       }
-  //     }
-  //     serial.write(b']');
-  //   }
-  //   let old_tmp = self.get_temp();
-  //   let next = self.map_temp(top).unwrap_or(0);
-  //   ds_recurse(self, next, &mut serial, 0);
-  //   serial.write(b'\n');
-  //   Self::map_temp(old_tmp).unwrap();
-  // }
+    fn ds_recurse(
+      ptm: &mut PageTableManager,
+      layer: VirtualAddress,
+      serial: &mut Serial,
+      depth: usize,
+    )
+    {
+      if layer == 0
+      {
+        return;
+      }
+      let entries = layer as *mut TableEntry;
+      serial.write(b'[');
+      let mut previous = false;
+      for i in 0..512
+      {
+        let entry = unsafe { entries.add(i).read() };
+        match entry.get_pointer()
+        {
+          0 => continue,
+          x =>
+          {
+            if previous
+            {
+              serial.write(b',');
+            }
+            serial.write(b'{');
+            let old_tmp = ptm.get_temp();
+            let next = ptm.map_temp(x).unwrap_or(0);
+            fmt::write(
+              serial,
+              format_args!(
+                "\"flags\":{},\"address\":\"{:x}\",\"depth\":{}",
+                entry.get_flags(),
+                entry.get_pointer(),
+                depth
+              ),
+            )
+            .unwrap();
+            if depth != TableLayer::PT.into()
+            {
+              fmt::write(serial, format_args!(",\"layer\":")).unwrap();
+              ds_recurse(ptm, next, serial, depth + 1);
+            }
+            ptm.map_temp(old_tmp).unwrap();
+            serial.write(b'}');
+            previous = true;
+          }
+        }
+      }
+      serial.write(b']');
+    }
+    let old_tmp = self.get_temp();
+    let next = self.map_temp(top).unwrap_or(0);
+    ds_recurse(self, next, &mut serial, 0);
+    serial.write(b'\n');
+    self.map_temp(old_tmp).unwrap();
+  }
 
   pub(crate) fn new_bootstrap() -> Result<Self, PtmError>
   {
+    let _ = Serial::new_uninit(COM0).write_fmt(format_args!(
+      "TOP INDEX: {}\n",
+      split_virtual(u64::MAX.bitxor(1u64.shl(47) - 1u64)).0[0]
+    ));
+
     let pg = PMM::pop_page();
 
     let phy_addr = pg;
@@ -223,21 +256,24 @@ impl PageTableManager
     let tmp_address = tmp_space;
     let tmp_entry_address = tmp_page + (tmp_space_idx as usize * size_of::<TableEntry>()) as u64;
 
+    // The kernels virtual and physical addresses
+    let kernel_start = kaddr.virtual_base();
+    let kernel_start_phy = kaddr.physical_base();
+
     let mut ptm = Self {
       phy_addr,
       tmp_address,
       tmp_entry_address,
+      mmap_tracker: Spinlock::new(None),
+      mmap_start: HIGHER_HALF_ADDR,
+      mmap_end: kernel_start,
     };
 
-    // The kernels virtual and physical addresses
-    let curr = kaddr.virtual_base();
-    let curr_phy = kaddr.physical_base();
-
     // kend is in virtual space so make sure to get difference between it and the virtual
-    let klen = kend - curr;
+    let klen = kend - kernel_start;
     ptm.map_range(
-      curr_phy..=curr_phy + klen,
-      curr..=curr + klen,
+      kernel_start_phy..=kernel_start_phy + klen,
+      kernel_start..=kernel_start + klen,
       paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
     )?;
 
@@ -246,7 +282,7 @@ impl PageTableManager
     // which means we need to make it modifiable without re-mapping or else we get crazy infinite recurrsion
     // we will use the next virtual page to map to the tmp space
 
-    let _hhdm_offs = limine_req::HHDM_REQ.get_response().unwrap().offset();
+    let _hhdm_offs = HHDM_OFFSET.get();
 
     let ptmp_page_entry = ptm.crawl_alloc(
       tmp_page,
@@ -265,14 +301,113 @@ impl PageTableManager
 
     set_cr3(phy_addr);
 
-    let heap_base = tmp_page + PAGE_SIZE;
+    USE_HHDM.store(false, core::sync::atomic::Ordering::Release);
 
+    let heap_base = tmp_page + PAGE_SIZE;
     KALLOC.set_base(heap_base);
     KALLOC.set_size((u64::MAX - heap_base) as usize);
 
-    USE_HHDM.store(false, core::sync::atomic::Ordering::Release);
+    ptm.dump_to_serial(pg);
 
     Ok(ptm)
+  }
+
+  pub fn mmap(&mut self, length: usize, flags: u64) -> Option<VirtualAddress>
+  {
+    let mut length = length.next_multiple_of(PAGE_SIZE as usize);
+    let mapping = self
+      .mmap_tracker
+      .lock()
+      .as_mut()
+      .unwrap()
+      .get_mapping(length)?;
+    let mut current = mapping.0.start as VirtualAddress;
+    let ret = current;
+    let mut o_self = Some(self);
+    while length > 0
+    {
+      let pg = PMM::pop_page_with_ptm(&mut o_self);
+      o_self = o_self.and_then(|x| {
+        x.map(pg, current, flags).unwrap();
+        Some(x)
+      });
+      current += PAGE_SIZE;
+      length -= PAGE_SIZE as usize;
+    }
+    Some(ret)
+  }
+
+  pub fn munmap(&mut self, addr: VirtualAddress, length: usize)
+  {
+    let page = get_containing_page(addr);
+    let offset = addr - page;
+    let length = (length as u64 + offset).next_multiple_of(PAGE_SIZE);
+
+    let mapping = page..page + length;
+
+    self.unmap_range(page..=page + length, true).unwrap();
+
+    self
+      .mmap_tracker
+      .lock()
+      .as_mut()
+      .unwrap()
+      .release_mapping(mapping.into());
+  }
+
+  pub fn map_into(
+    &mut self,
+    phy_addr: PhysicalAddress,
+    length: usize,
+    flags: u64,
+  ) -> Option<VirtualAddress>
+  {
+    let page = get_containing_page(phy_addr);
+    let offset = phy_addr - page;
+    let length = (length + offset as usize).next_multiple_of(PAGE_SIZE as usize);
+    let mapping: Range<VirtualAddress> = self
+      .mmap_tracker
+      .lock()
+      .as_mut()
+      .unwrap()
+      .get_mapping(length)?
+      .into();
+    let ret = mapping.start;
+    self
+      .map_range(
+        page..=page + length as u64,
+        mapping.start..=mapping.end,
+        flags,
+      )
+      .ok()?;
+    Some(ret)
+  }
+
+  pub fn new(
+    &mut self,
+    mmap_start: VirtualAddress,
+    mmap_end: VirtualAddress,
+  ) -> Result<Self, PtmError>
+  {
+    let p_higher_half = self.crawl(HIGHER_HALF_ADDR, TableLayer::PML4)?;
+    let higher_half = unsafe { *p_higher_half };
+    let (tmp_address, tmp_entry_address) = (self.tmp_address, self.tmp_entry_address);
+    let phy_addr = PMM::pop_page_with_ptm(&mut Some(self));
+    let mut ret = Self {
+      phy_addr,
+      tmp_address,
+      tmp_entry_address,
+      mmap_tracker: Spinlock::new(None), // TODO! Figure out what to do here lmao
+      mmap_start,
+      mmap_end,
+    };
+
+    unsafe {
+      ret
+        .crawl(HIGHER_HALF_ADDR, TableLayer::PML4)?
+        .write(higher_half);
+    };
+    Ok(ret)
   }
 
   pub fn map(
@@ -327,7 +462,7 @@ impl PageTableManager
         (*entry).set_flags(0);
         if free_phy
         {
-          PMM::push_page(ret);
+          PMM::push_page_with_ptm(ret, self);
         }
         Ok(())
       })
@@ -350,7 +485,11 @@ impl PageTableManager
       .unwrap()
   }
 
-  pub fn unmap_range(virt: RangeInclusive<VirtualAddress>, free_phy: bool) -> Result<(), PtmError>
+  pub fn unmap_range(
+    &mut self,
+    virt: RangeInclusive<VirtualAddress>,
+    free_phy: bool,
+  ) -> Result<(), PtmError>
   {
     if (virt.end() - virt.start()) % PAGE_SIZE != 0
     {
@@ -362,10 +501,7 @@ impl PageTableManager
     }
     for pg in virt.step_by(PAGE_SIZE as usize)
     {
-      if Self::unmap_interrupt(pg, free_phy) == -1
-      {
-        return Err(PtmError::NoMapping(pg));
-      }
+      self.unmap(pg, free_phy)?;
     }
     Ok(())
   }
@@ -404,10 +540,8 @@ impl PageTableManager
   {
     if USE_HHDM.load(core::sync::atomic::Ordering::Acquire)
     {
-      let hhdm = HHDM_REQ.get_response().unwrap().offset();
-      Serial::new_uninit(COM0)
-        .write_fmt(format_args!("0x{phy_addr:x} + 0x{hhdm:x}\n"))
-        .unwrap();
+      let hhdm = HHDM_OFFSET.get();
+
       return Ok(phy_addr + hhdm);
     }
 
@@ -493,7 +627,7 @@ impl PageTableManager
     {
       Err(PtmError::PtmNotReady) =>
       {
-        let offset = HHDM_REQ.get_response().unwrap().offset();
+        let offset = HHDM_OFFSET.get();
 
         Ok(virt_addr - offset)
       }

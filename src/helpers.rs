@@ -5,6 +5,7 @@ use crate::{
   memory::{
     paging::{self, PageTableManager, PtmError, VirtualAddress},
     pmm::PhysicalAddress,
+    HHDM_OFFSET,
   },
 };
 
@@ -46,7 +47,7 @@ pub fn map_phy_temp<T: DerefMut<Target = PageTableManager>>(
   }
   else
   {
-    let hhdm = HHDM_REQ.get_response().unwrap().offset();
+    let hhdm = HHDM_OFFSET.get().clone();
     Ok(phy_addr + hhdm)
   }
 }

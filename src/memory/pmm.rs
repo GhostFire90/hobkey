@@ -7,6 +7,7 @@ use super::paging::PageTableManager;
 use super::PAGE_SIZE;
 use crate::helpers::{get_temp_addr, map_phy_temp};
 use crate::limine_req::{HHDM_REQ, MM_REQ};
+use crate::memory::HHDM_OFFSET;
 use crate::process::CURRENT_PROC;
 use crate::spinlock::*;
 
@@ -57,7 +58,7 @@ impl PMM
   {
     let mut avail = 0;
     let memmap = MM_REQ.get_response().unwrap();
-    let hhdm_offset = HHDM_REQ.get_response().unwrap().offset();
+    let hhdm_offset = HHDM_OFFSET.get();
     let mut current: *mut PmmNode = ptr::null_mut();
     let mut last: *mut PmmNode = current;
     for entry in memmap

@@ -28,7 +28,7 @@ impl Process
   }
   pub(crate) fn ptm_operation<T>(
     &self,
-    function: impl Fn(&mut PageTableManager) -> Result<T, PtmError>,
+    function: impl FnOnce(&mut PageTableManager) -> Result<T, PtmError>,
   ) -> Result<T, PtmError>
   {
     let mut guard = self.ptm.lock();

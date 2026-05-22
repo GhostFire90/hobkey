@@ -6,8 +6,10 @@ use alloc::vec::Vec;
 use crate::drivers::pci::pci_communication::PciDevice;
 use crate::drivers::serial::{self, Serial};
 use crate::limine_req::{FB_REQ, HHDM_REQ, MODULE_REQ};
+use crate::memory::mmap::MmapTracker;
 use crate::memory::paging::{paging_flags, PageTableManager};
 use crate::memory::pmm::PMM;
+use crate::memory::HHDM_OFFSET;
 use crate::process::{Process, CURRENT_PROC};
 use crate::spinlock::Spinlock;
 use crate::syscalls;
@@ -50,46 +52,59 @@ pub extern "C" fn kmain() -> !
     .iter()
     .find(|x| cstrcmp(x.path().to_bytes(), "/boot/initrd.tar".as_bytes()))
     .unwrap();
-  let hhdm_offset = HHDM_REQ.get_response().unwrap().offset();
-  let initrd_addr = initrd_mod.addr() as u64;
+  let hhdm_offset = HHDM_OFFSET.get();
+  let mut initrd_addr = initrd_mod.addr() as u64;
   let initrd_phy = initrd_addr - hhdm_offset;
   let initrd_size = initrd_mod.size().next_multiple_of(4096);
 
-  let fb_addr = fb.addr() as u64;
+  let mut fb_addr = fb.addr() as u64;
   let fb_phy = fb_addr - hhdm_offset;
 
-  serial
-    .write_fmt(format_args!("INITRD_ADDR 0x{:x}\n", initrd_addr))
-    .unwrap();
+  syscalls::syscalls_initialize();
 
   PMM::init();
   PMM::reclaim_bootloader().unwrap();
   let ptm = PageTableManager::new_bootstrap().unwrap();
+  let mmap_start = ptm.mmap_start;
+  let mmap_end = ptm.mmap_end;
+
   let kernel_proc = Process::new(ptm);
   let mut proc_guard = CURRENT_PROC.lock();
   proc_guard.replace(kernel_proc);
+  drop(proc_guard);
+
+  let mmap_tracker = MmapTracker::new(mmap_start, mmap_end);
+
+  proc_guard = CURRENT_PROC.lock();
   let proc = proc_guard.as_mut().unwrap();
 
   proc
     .ptm_operation(|ptm| {
-      ptm
-        .map_range(
-          initrd_phy..=initrd_phy + initrd_size,
-          initrd_addr..=initrd_addr + initrd_size,
-          paging_flags::PAGING_PRESENT | paging_flags::PAGING_R,
+      ptm.mmap_tracker.lock().replace(mmap_tracker);
+      initrd_addr = ptm
+        .map_into(
+          initrd_phy,
+          initrd_size as usize,
+          paging_flags::PAGING_PRESENT,
         )
-        .and(ptm.map_range(
-          fb_phy..=fb_phy + buf_len as u64,
-          fb_addr..=fb_addr + buf_len as u64,
+        .unwrap();
+      fb_addr = ptm
+        .map_into(
+          fb_phy,
+          buf_len,
           paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
-        ))
+        )
+        .unwrap();
+      Ok(())
     })
     .unwrap();
 
   serial
     .write_fmt(format_args!("FRAME_BUFF ADDR 0x{:x}\n", fb_addr))
     .unwrap();
-  syscalls::syscalls_initialize();
+  serial
+    .write_fmt(format_args!("INITRD_ADDR 0x{:x}\n", initrd_addr))
+    .unwrap();
 
   let _f = ustar::find_file("./test.txt", initrd_addr as *const u8, initrd_size as usize).unwrap();
   serial
