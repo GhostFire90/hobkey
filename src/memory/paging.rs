@@ -203,7 +203,7 @@ impl PageTableManager
             fmt::write(
               serial,
               format_args!(
-                "\"flags\":{},\"address\":\"{:x}\",\"depth\":{}",
+                "\"flags\":{:#b},\"address\":\"{:x}\",\"depth\":{}",
                 entry.get_flags(),
                 entry.get_pointer(),
                 depth

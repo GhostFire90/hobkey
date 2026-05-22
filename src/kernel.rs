@@ -1,17 +1,14 @@
 use core::ffi::CStr;
 use core::fmt::{self, Write};
 
-use alloc::vec::Vec;
-
 use crate::drivers::pci::pci_communication::PciDevice;
 use crate::drivers::serial::{self, Serial};
-use crate::limine_req::{FB_REQ, HHDM_REQ, MODULE_REQ};
+use crate::limine_req::{FB_REQ, MODULE_REQ};
 use crate::memory::mmap::MmapTracker;
 use crate::memory::paging::{paging_flags, PageTableManager};
 use crate::memory::pmm::PMM;
 use crate::memory::HHDM_OFFSET;
 use crate::process::{Process, CURRENT_PROC};
-use crate::spinlock::Spinlock;
 use crate::syscalls;
 use crate::ustar;
 
