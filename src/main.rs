@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
+#![feature(btree_set_entry)]
 
 extern crate alloc;
 
@@ -11,6 +12,7 @@ mod idt;
 mod kernel;
 mod limine_req;
 mod memory;
+mod process;
 mod spinlock;
 pub mod syscalls;
 mod timers;

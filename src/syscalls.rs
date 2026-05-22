@@ -6,13 +6,13 @@ extern "sysv64" {
   fn register_syscall(num: u8, func: *const ());
 }
 extern "x86-interrupt" {
-  fn syscall_int(_: InterruptStackFrame) -> ();
+  fn syscall_int(stack_frame: InterruptStackFrame) -> ();
 }
 
 pub fn syscalls_initialize()
 {
   const SYSCALLS: [*const (); 3] = [
-    PageTableManager::map as *const (),
+    PageTableManager::map_interrupt as *const (),
     PMM::pop_page as *const (),
     PMM::push_page as *const (),
   ];
