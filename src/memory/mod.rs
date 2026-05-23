@@ -1,9 +1,6 @@
-use core::{cell::LazyCell, ops::Range};
+use core::ops::Range;
 
-use crate::{
-  limine_req::HHDM_REQ,
-  spinlock::{LazySpinlock, SpinlockOnce},
-};
+use crate::{limine_req::HHDM_REQ, spinlock::LazySpinlock};
 
 pub mod alloc;
 pub mod mmap;

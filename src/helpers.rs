@@ -1,12 +1,9 @@
 use core::ops::{Deref, DerefMut};
 
-use crate::{
-  limine_req::HHDM_REQ,
-  memory::{
-    paging::{self, PageTableManager, PtmError, VirtualAddress},
-    pmm::PhysicalAddress,
-    HHDM_OFFSET,
-  },
+use crate::memory::{
+  paging::{PageTableManager, PtmError, VirtualAddress},
+  pmm::PhysicalAddress,
+  HHDM_OFFSET,
 };
 
 pub fn atou(bytes: &[u8], base: u8) -> Option<usize>

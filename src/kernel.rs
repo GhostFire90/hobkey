@@ -1,15 +1,19 @@
 use core::ffi::CStr;
 use core::fmt::{self, Write};
+use core::ptr::NonNull;
 
+use crate::drivers::acpi::{Xsdp, Xsdt, RSDP};
 use crate::drivers::pci::pci_communication::PciDevice;
 use crate::drivers::serial::{self, Serial};
-use crate::limine_req::{FB_REQ, MODULE_REQ};
+use crate::limine_req::{FB_REQ, MODULE_REQ, RSDP_REQ};
 use crate::memory::mmap::MmapTracker;
-use crate::memory::paging::{paging_flags, PageTableManager};
+use crate::memory::paging::paging_flags::{PAGING_PRESENT, PAGING_RW};
+use crate::memory::paging::{paging_flags, PageTableManager, VirtualAddress};
 use crate::memory::pmm::PMM;
-use crate::memory::HHDM_OFFSET;
+use crate::memory::{get_containing_page, HHDM_OFFSET, PAGE_SIZE};
 use crate::process::{Process, CURRENT_PROC};
 use crate::syscalls;
+use crate::timers::apic::MADT;
 use crate::ustar;
 
 fn cstrcmp(a: &[u8], b: &[u8]) -> bool
@@ -28,6 +32,18 @@ fn cstrcmp(a: &[u8], b: &[u8]) -> bool
 pub extern "C" fn kmain() -> !
 {
   let mut serial = Serial::new(serial::COM0).unwrap();
+  // gotta figure this out lmao
+  RSDP.get_or_init(|| {
+    let response = RSDP_REQ.get_response().unwrap().address();
+    let p_xsdp = response as *mut Xsdp;
+    unsafe {
+      let xsdp = *p_xsdp;
+      (
+        response as VirtualAddress - HHDM_OFFSET.get(),
+        xsdp.length as usize,
+      )
+    }
+  });
 
   fmt::write(
     &mut serial,
@@ -74,6 +90,7 @@ pub extern "C" fn kmain() -> !
 
   proc_guard = CURRENT_PROC.lock();
   let proc = proc_guard.as_mut().unwrap();
+  let mut xsdp = None;
 
   proc
     .ptm_operation(|ptm| {
@@ -92,9 +109,30 @@ pub extern "C" fn kmain() -> !
           paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
         )
         .unwrap();
+      xsdp = NonNull::new({
+        let (addr, len) = RSDP.get().unwrap().clone();
+
+        (ptm.map_into(addr, len, PAGING_RW | PAGING_PRESENT)?) as *mut Xsdp
+      });
+
       Ok(())
     })
     .unwrap();
+  drop(proc_guard);
+
+  Xsdt::new(xsdp.unwrap()).iter().for_each(|x| {
+    serial
+      .write_fmt(format_args!("XSDT Found: 0x{:x}\n", x.addr()))
+      .unwrap();
+    unsafe {
+      serial
+        .write_fmt(format_args!(
+          "APIC at {:p}\n",
+          x.as_ref().find_table::<MADT>("APIC").unwrap().as_ptr()
+        ))
+        .unwrap()
+    };
+  });
 
   serial
     .write_fmt(format_args!("FRAME_BUFF ADDR 0x{:x}\n", fb_addr))

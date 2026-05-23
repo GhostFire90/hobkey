@@ -4,16 +4,14 @@ use super::pmm::{PhysicalAddress, PmmError, PMM};
 use super::PAGE_SIZE;
 use crate::drivers::serial::{Serial, COM0};
 use crate::helpers::map_phy_temp;
-use crate::limine_req::{HHDM_REQ, KERNEL_REQ};
+use crate::limine_req::KERNEL_REQ;
 use crate::memory::alloc::KALLOC;
 use crate::memory::mmap::MmapTracker;
-use crate::memory::{get_containing_page, MemoryRange, HHDM_OFFSET};
+use crate::memory::{get_containing_page, HHDM_OFFSET};
 use crate::process::CURRENT_PROC;
-use crate::{limine_req, spinlock::*};
+use crate::spinlock::*;
 use core::arch::{asm, global_asm};
-use core::cell::LazyCell;
 use core::fmt::Write;
-use core::mem::MaybeUninit;
 use core::ops::{BitXor, Range, RangeInclusive, Shl};
 use core::sync::atomic::AtomicBool;
 use core::{fmt, include_str, usize};
@@ -111,6 +109,7 @@ pub enum PtmError
   UnallignedPage,
   PmmError(PmmError),
   PtmNotReady,
+  MmapOOM,
 }
 
 fn split_virtual(virt: VirtualAddress) -> ([u16; 4], u16)
@@ -272,8 +271,8 @@ impl PageTableManager
     // kend is in virtual space so make sure to get difference between it and the virtual
     let klen = kend - kernel_start;
     ptm.map_range(
-      kernel_start_phy..=kernel_start_phy + klen,
-      kernel_start..=kernel_start + klen,
+      kernel_start_phy..kernel_start_phy + klen + PAGE_SIZE,
+      kernel_start..kernel_start + klen + PAGE_SIZE,
       paging_flags::PAGING_RW | paging_flags::PAGING_PRESENT,
     )?;
 
@@ -360,7 +359,7 @@ impl PageTableManager
     phy_addr: PhysicalAddress,
     length: usize,
     flags: u64,
-  ) -> Option<VirtualAddress>
+  ) -> Result<VirtualAddress, PtmError>
   {
     let page = get_containing_page(phy_addr);
     let offset = phy_addr - page;
@@ -370,17 +369,17 @@ impl PageTableManager
       .lock()
       .as_mut()
       .unwrap()
-      .get_mapping(length)?
+      .get_mapping(length)
+      .ok_or(PtmError::MmapOOM)?
       .into();
     let ret = mapping.start;
-    self
-      .map_range(
-        page..=page + length as u64,
-        mapping.start..=mapping.end,
-        flags,
-      )
-      .ok()?;
-    Some(ret)
+    self.map_range(
+      page..page + length as u64,
+      mapping.start..mapping.end,
+      flags,
+    )?;
+
+    Ok(ret + offset)
   }
 
   pub fn new(
@@ -423,8 +422,8 @@ impl PageTableManager
     entry.set_flags(flags);
 
     unsafe {
-      invalidate_page(virt_addr);
       pentry.write(entry);
+      invalidate_page(virt_addr);
     };
     Ok(())
   }
@@ -508,8 +507,8 @@ impl PageTableManager
 
   pub fn map_range(
     &mut self,
-    phy: RangeInclusive<PhysicalAddress>,
-    virt: RangeInclusive<VirtualAddress>,
+    phy: Range<PhysicalAddress>,
+    virt: Range<VirtualAddress>,
     flags: u64,
   ) -> Result<(), PtmError>
   {
@@ -517,11 +516,11 @@ impl PageTableManager
     {
       Err(PtmError::InvalidRange)
     }
-    else if (phy.end() - phy.start()) % PAGE_SIZE != 0
+    else if (phy.end - phy.start) % PAGE_SIZE != 0
     {
       Err(PtmError::IncorrectPageSize)
     }
-    else if phy.start() % PAGE_SIZE != 0
+    else if phy.start % PAGE_SIZE != 0
     {
       Err(PtmError::UnallignedPage)
     }

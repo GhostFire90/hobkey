@@ -1,5 +1,3 @@
-use core::ops::Range;
-
 use alloc::collections::BTreeSet;
 
 use crate::memory::{paging::VirtualAddress, MemoryRange, PAGE_SIZE};

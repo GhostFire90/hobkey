@@ -6,7 +6,7 @@ use limine::memory_map::EntryType;
 use super::paging::PageTableManager;
 use super::PAGE_SIZE;
 use crate::helpers::{get_temp_addr, map_phy_temp};
-use crate::limine_req::{HHDM_REQ, MM_REQ};
+use crate::limine_req::MM_REQ;
 use crate::memory::HHDM_OFFSET;
 use crate::process::CURRENT_PROC;
 use crate::spinlock::*;
