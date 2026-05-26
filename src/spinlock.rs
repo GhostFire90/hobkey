@@ -1,6 +1,6 @@
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{self, AtomicBool, AtomicU8};
+use core::sync::atomic::{self, AtomicBool};
 
 pub struct Spinlock<T>
 {

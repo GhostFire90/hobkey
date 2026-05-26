@@ -10,23 +10,12 @@ use crate::memory::mmap::MmapTracker;
 use crate::memory::paging::paging_flags::{PAGING_PRESENT, PAGING_RW};
 use crate::memory::paging::{paging_flags, PageTableManager, VirtualAddress};
 use crate::memory::pmm::PMM;
-use crate::memory::{get_containing_page, HHDM_OFFSET, PAGE_SIZE};
+use crate::memory::HHDM_OFFSET;
 use crate::process::{Process, CURRENT_PROC};
+use crate::psf::Psf;
 use crate::syscalls;
 use crate::timers::apic::MADT;
 use crate::ustar;
-
-fn cstrcmp(a: &[u8], b: &[u8]) -> bool
-{
-  for (ac, bc) in a.iter().zip(b.iter())
-  {
-    if *ac != *bc
-    {
-      return false;
-    }
-  }
-  true
-}
 
 #[no_mangle]
 pub extern "C" fn kmain() -> !
@@ -63,7 +52,7 @@ pub extern "C" fn kmain() -> !
   let modules = MODULE_REQ.get_response().unwrap().modules();
   let initrd_mod = modules
     .iter()
-    .find(|x| cstrcmp(x.path().to_bytes(), "/boot/initrd.tar".as_bytes()))
+    .find(|x| x.path().to_bytes().eq("/boot/initrd.tar".as_bytes()))
     .unwrap();
   let hhdm_offset = HHDM_OFFSET.get();
   let mut initrd_addr = initrd_mod.addr() as u64;
@@ -122,12 +111,12 @@ pub extern "C" fn kmain() -> !
 
   Xsdt::new(xsdp.unwrap()).iter().for_each(|x| {
     serial
-      .write_fmt(format_args!("XSDT Found: 0x{:x}\n", x.addr()))
+      .write_fmt(format_args!("XSDT at: 0x{:x}\n", x.addr()))
       .unwrap();
     unsafe {
       serial
         .write_fmt(format_args!(
-          "APIC at {:p}\n",
+          "APIC at: {:p}\n",
           x.as_ref().find_table::<MADT>("APIC").unwrap().as_ptr()
         ))
         .unwrap()
@@ -141,14 +130,12 @@ pub extern "C" fn kmain() -> !
     .write_fmt(format_args!("INITRD_ADDR 0x{:x}\n", initrd_addr))
     .unwrap();
 
-  let _f = ustar::find_file("./test.txt", initrd_addr as *const u8, initrd_size as usize).unwrap();
-  serial
-    .write_str(
-      unsafe { CStr::from_ptr((initrd_addr as usize + _f.1) as *const i8) }
-        .to_str()
-        .unwrap(),
-    )
-    .unwrap();
+  let initrd_addr = NonNull::new(initrd_addr as *mut u8).expect("Initrd address is NULL");
+  let _f = ustar::find_file("./test.txt", initrd_addr, initrd_size as usize).unwrap();
+
+  let (_, psf_file_offset) =
+    ustar::find_file("./resources/zap-vga.psf", initrd_addr, initrd_size as usize).unwrap();
+  let psf = Psf::new(unsafe { initrd_addr.add(psf_file_offset) }).unwrap();
 
   for bus in 0..255
   {

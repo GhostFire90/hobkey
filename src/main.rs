@@ -13,6 +13,7 @@ mod kernel;
 mod limine_req;
 mod memory;
 mod process;
+mod psf;
 mod spinlock;
 pub mod syscalls;
 mod timers;
