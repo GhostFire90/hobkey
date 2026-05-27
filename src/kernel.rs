@@ -15,7 +15,7 @@ use crate::process::{Process, CURRENT_PROC};
 use crate::psf::Psf;
 use crate::syscalls;
 use crate::timers::apic::MADT;
-use crate::ustar;
+use crate::ustar::{self, UstarArchive};
 
 #[no_mangle]
 pub extern "C" fn kmain() -> !
@@ -131,11 +131,17 @@ pub extern "C" fn kmain() -> !
     .unwrap();
 
   let initrd_addr = NonNull::new(initrd_addr as *mut u8).expect("Initrd address is NULL");
-  let _f = ustar::find_file("./test.txt", initrd_addr, initrd_size as usize).unwrap();
+  let ustar = UstarArchive::new(initrd_addr, initrd_size as usize);
 
-  let (_, psf_file_offset) =
-    ustar::find_file("./resources/zap-vga.psf", initrd_addr, initrd_size as usize).unwrap();
-  let psf = Psf::new(unsafe { initrd_addr.add(psf_file_offset) }).unwrap();
+  for (header, _) in ustar.iter()
+  {
+    let (name_bytes, len) = header.file_name();
+    let name = str::from_utf8(&name_bytes[0..len]).unwrap();
+    serial.write_fmt(format_args!("File: {}\n", name)).unwrap();
+  }
+
+  let (_, psf_file) = ustar.iter().find_file("./resources/zap-vga.psf").unwrap();
+  let psf = Psf::new(NonNull::new(psf_file.as_ptr() as *mut u8).unwrap()).unwrap();
 
   for bus in 0..255
   {
