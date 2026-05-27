@@ -14,8 +14,6 @@ Current features:
  - Dynamic mapping of arbitrary physical pages
  - ACPI parsing
  - PSF font parsing
-
-Missing features (features I have yet to port to the rust kernel):
  - Frame-buffer print functionality
 
 <!-- more -->
