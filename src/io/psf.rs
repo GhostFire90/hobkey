@@ -210,6 +210,11 @@ impl Psf
     })
   }
 
+  pub fn glyphs(&self, s: &str) -> Result<Vec<Glyph>, PsfError>
+  {
+    s.chars().into_iter().map(|x| self.get_glyph(x)).collect()
+  }
+
   /// Width of each glyph in pixels
   #[inline]
   pub fn width(&self) -> usize
@@ -260,5 +265,63 @@ impl Glyph
       })
       .flatten()
       .collect()
+  }
+
+  #[inline]
+  fn expand_bitmask(bitmask: u8, fg_color: u32, bg_color: u32) -> Vec<u32>
+  {
+    let mut res = vec![bg_color; 8];
+    for i in 0..8
+    {
+      let on = (bitmask >> (8 - i - 1)) & 0x1 == 1;
+      if on
+      {
+        res[i] = fg_color;
+      }
+    }
+    res
+  }
+
+  #[inline]
+  pub fn expand_str(glyphs: &[Self], fg_color: u32, bg_color: u32) -> Vec<u32>
+  {
+    if glyphs.is_empty()
+    {
+      return vec![];
+    }
+
+    // how many characters
+    let glyph_count = glyphs.len();
+
+    // height of each glyph
+    let glyph_height = glyphs[0].height;
+
+    // the stride between rows in an individual glyph
+    let glyph_row_stride = glyphs[0].width.next_multiple_of(8) / 8;
+
+    // Length of row in bytes
+    let row_length = glyphs[0].width * glyph_count;
+
+    // length of final buffer
+    let total_bytes = row_length * glyph_height;
+
+    // return pixels
+    let mut ret = Vec::with_capacity(total_bytes);
+
+    for row in 0..glyph_height
+    {
+      let start = row * glyph_row_stride;
+      for col in 0..glyph_count
+      {
+        let glyph = &glyphs[col];
+        let mut bytes = glyph.bitmask[start..start + glyph_row_stride]
+          .iter()
+          .flat_map(|x| Self::expand_bitmask(*x, fg_color, bg_color))
+          .collect();
+        ret.append(&mut bytes);
+      }
+    }
+
+    ret
   }
 }

@@ -9,15 +9,14 @@ mod assembly;
 mod drivers;
 mod helpers;
 mod idt;
+mod io;
 mod kernel;
 mod limine_req;
 mod memory;
 mod process;
-mod psf;
 mod spinlock;
 pub mod syscalls;
 mod timers;
-mod ustar;
 mod utils;
 
 use core::{fmt, panic::PanicInfo};

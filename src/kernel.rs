@@ -5,6 +5,9 @@ use crate::drivers::acpi::{Xsdp, Xsdt, RSDP};
 
 use crate::drivers::pci::pci_communication::PciDeviceAddress;
 use crate::drivers::serial::{self, Serial};
+use crate::io::framebuffer::Framebuffer;
+use crate::io::psf::{Glyph, Psf};
+use crate::io::ustar::UstarArchive;
 use crate::limine_req::{FB_REQ, MODULE_REQ, RSDP_REQ};
 use crate::memory::mmap::MmapTracker;
 use crate::memory::paging::paging_flags::{PAGING_PRESENT, PAGING_RW};
@@ -12,10 +15,8 @@ use crate::memory::paging::{paging_flags, PageTableManager, VirtualAddress};
 use crate::memory::pmm::PMM;
 use crate::memory::HHDM_OFFSET;
 use crate::process::{Process, CURRENT_PROC};
-use crate::psf::Psf;
 use crate::syscalls;
 use crate::timers::apic::MADT;
-use crate::ustar::UstarArchive;
 
 #[no_mangle]
 pub extern "C" fn kmain() -> !
@@ -45,9 +46,7 @@ pub extern "C" fn kmain() -> !
   let fbr = FB_REQ.get_response().unwrap();
   let fb = fbr.framebuffers().next().unwrap();
 
-  let buf_len: usize = ((fb.bpp() as u64 / 8) * fb.width() * fb.height())
-    .try_into()
-    .unwrap();
+  let buf_len: usize = (fb.pitch() * fb.height()) as usize;
 
   let modules = MODULE_REQ.get_response().unwrap().modules();
   let initrd_mod = modules
@@ -62,6 +61,7 @@ pub extern "C" fn kmain() -> !
   let mut fb_addr = fb.addr() as u64;
   let fb_phy = fb_addr - hhdm_offset;
   let fb_stride = fb.pitch();
+  let fb_dim = (fb.width() as usize, fb.height() as usize);
 
   syscalls::syscalls_initialize();
 
@@ -132,7 +132,7 @@ pub extern "C" fn kmain() -> !
     .unwrap();
 
   let initrd_addr = NonNull::new(initrd_addr as *mut u8).expect("Initrd address is NULL");
-  let ustar = UstarArchive::new(initrd_addr, initrd_size as usize);
+  let ustar = UstarArchive::new(initrd_addr);
 
   for (header, _) in ustar.iter()
   {
@@ -152,22 +152,15 @@ pub extern "C" fn kmain() -> !
     ))
     .unwrap();
 
-  let fb =
-    unsafe { core::slice::from_raw_parts_mut(fb_addr as *mut u32, buf_len / size_of::<u32>()) };
-  let glyph_width = psf.width();
+  let mut fb = Framebuffer::new(
+    NonNull::new(fb_addr as *mut u8).unwrap(),
+    fb_dim.0,
+    fb_dim.1,
+    fb_stride as usize,
+  );
+  fb.set_font(psf);
 
-  let mut x_offset = 0;
-  for c in 0..127
-  {
-    let glyph = psf.get_glyph(c.into()).unwrap().expand(u32::MAX, 0);
-    for i in 0..glyph.len()
-    {
-      let row = i / glyph_width;
-      let col = i % glyph_width;
-      fb[row * (fb_stride as usize / 4) + col + x_offset] = glyph[i];
-    }
-    x_offset += glyph_width;
-  }
+  fb.write_str("Hello World").unwrap();
 
   for bus in 0..255
   {

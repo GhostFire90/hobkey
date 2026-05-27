@@ -1,4 +1,4 @@
-use core::{ffi::CStr, marker::PhantomData, ops::Index, ptr::NonNull};
+use core::{marker::PhantomData, ptr::NonNull};
 
 use alloc::slice;
 
@@ -101,8 +101,6 @@ pub struct UstarArchive<'a>
 {
   data: NonNull<u8>,
 
-  length: usize,
-
   _boo: PhantomData<&'a [u8]>,
 }
 
@@ -113,11 +111,10 @@ pub struct UstarIter<'a>
 }
 impl<'a> UstarArchive<'a>
 {
-  pub fn new(data: NonNull<u8>, length: usize) -> Self
+  pub fn new(data: NonNull<u8>) -> Self
   {
     Self {
       data,
-      length,
       _boo: PhantomData,
     }
   }
