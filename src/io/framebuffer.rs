@@ -20,7 +20,7 @@ pub struct Framebuffer<'a>
   fg_color: u32,
   bg_color: u32,
 
-  font: Option<Psf>,
+  font: Option<Psf<'a>>,
   /// not pixel positions, its character positions
   cursor_pos: (usize, usize),
 
@@ -46,7 +46,7 @@ impl<'a> Framebuffer<'a>
     }
   }
   #[inline]
-  pub fn set_font(&mut self, font: Psf) -> Option<Psf>
+  pub fn set_font(&mut self, font: Psf<'a>) -> Option<Psf<'_>>
   {
     self.font.replace(font)
   }
@@ -88,31 +88,41 @@ impl<'a> Write for Framebuffer<'a>
       return Err(fmt::Error);
     }
 
-    let font = self.font.as_ref().unwrap();
-    let bytes = Glyph::expand_str(
-      &font.glyphs(s).map_err(|_| fmt::Error)?,
-      self.fg_color,
-      self.bg_color,
-    );
-    let glyph_count = s.len();
-    let glyph_width = font.width();
-    let glyph_height = font.height();
-    let start_pos = self.cursor_pos.0 * glyph_width + glyph_height * self.pitch * self.cursor_pos.1;
-    let pixels = unsafe {
-      slice::from_raw_parts_mut(
-        self.address.as_ptr() as *mut u32,
-        self.size / size_of::<u32>(),
-      )
-    };
-
-    for i in 0..bytes.len()
+    for s in s.split_inclusive("\n")
     {
-      let row = i / (glyph_width * glyph_count);
-      let col = i % (glyph_width * glyph_count);
-      let pos = row * (self.pitch / size_of::<u32>()) + col;
-      pixels[pos + start_pos] = bytes[i];
+      let font = self.font.as_ref().unwrap();
+      let bytes = Glyph::expand_str(
+        &font.glyphs(s).map_err(|_| fmt::Error)?,
+        self.fg_color,
+        self.bg_color,
+      );
+      let glyph_count = s.len();
+      let glyph_width = font.width();
+      let glyph_height = font.height();
+      let start_pos = self.cursor_pos.0 * glyph_width
+        + glyph_height * (self.pitch / size_of::<u32>()) * self.cursor_pos.1;
+      let pixels = unsafe {
+        slice::from_raw_parts_mut(
+          self.address.as_ptr() as *mut u32,
+          self.size / size_of::<u32>(),
+        )
+      };
+
+      for i in 0..glyph_height
+      {
+        let row_size = glyph_width * glyph_count;
+        let row = i;
+        let pos = start_pos + row * (self.pitch / size_of::<u32>());
+        pixels[pos..pos + row_size].copy_from_slice(&bytes[i * row_size..(i + 1) * row_size]);
+      }
+      self.cursor_pos.0 += glyph_count;
+      if s.contains('\n')
+      {
+        self.cursor_pos.0 = 0;
+        self.cursor_pos.1 += 1;
+      }
     }
-    self.cursor_pos.0 += glyph_count;
+
     Ok(())
   }
 }

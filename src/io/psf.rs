@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 use core::ptr::NonNull;
 
 use alloc::vec;
@@ -120,21 +121,22 @@ impl PsfHeader
 }
 
 /// Glyph type, just bitmasks
-pub struct Glyph
+pub struct Glyph<'a>
 {
-  pub bitmask: Vec<u8>,
+  pub bitmask: &'a [u8],
   pub width: usize,
   pub height: usize,
 }
 
-pub struct Psf
+pub struct Psf<'a>
 {
   pub data: NonNull<u8>,
 
   header: PsfHeader,
+  _boo: PhantomData<Glyph<'a>>,
 }
 
-impl Psf
+impl<'a> Psf<'a>
 {
   /// # SAFETEY!!!!
   /// `data` must have a lifetime >= the resultant Self. </br>
@@ -151,6 +153,7 @@ impl Psf
     Ok(Self {
       data: unsafe { data.byte_add(header_size) },
       header,
+      _boo: PhantomData,
     })
   }
   pub fn is_unicode(&self) -> bool
@@ -235,7 +238,7 @@ impl Psf
   }
 }
 
-impl Glyph
+impl<'a> Glyph<'a>
 {
   /// Expands self into a RGB color array,
   #[inline]
