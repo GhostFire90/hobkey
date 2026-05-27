@@ -16,6 +16,7 @@
             }).dev
             libisoburn
             lldb
+            ascii
           ];
 
         };

@@ -1,4 +1,4 @@
-use core::{ffi::CStr, marker::PhantomData, ptr::NonNull};
+use core::{ffi::CStr, marker::PhantomData, ops::Index, ptr::NonNull};
 
 use alloc::slice;
 
@@ -43,7 +43,7 @@ impl UstarHeader
       .map(|x| x - b'0')
       .rev()
       .enumerate()
-      .map(|(index, digit)| 8_usize.pow(index as u32) * digit as usize)
+      .map(|(index, digit)| (digit as usize) << (3 * index))
       .sum()
   }
   pub fn file_name(&self) -> ([u8; 255], usize)

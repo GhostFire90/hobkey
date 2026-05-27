@@ -1,9 +1,9 @@
-use core::ffi::CStr;
 use core::fmt::{self, Write};
 use core::ptr::NonNull;
 
 use crate::drivers::acpi::{Xsdp, Xsdt, RSDP};
-use crate::drivers::pci::pci_communication::PciDevice;
+
+use crate::drivers::pci::pci_communication::PciDeviceAddress;
 use crate::drivers::serial::{self, Serial};
 use crate::limine_req::{FB_REQ, MODULE_REQ, RSDP_REQ};
 use crate::memory::mmap::MmapTracker;
@@ -15,7 +15,7 @@ use crate::process::{Process, CURRENT_PROC};
 use crate::psf::Psf;
 use crate::syscalls;
 use crate::timers::apic::MADT;
-use crate::ustar::{self, UstarArchive};
+use crate::ustar::UstarArchive;
 
 #[no_mangle]
 pub extern "C" fn kmain() -> !
@@ -61,6 +61,7 @@ pub extern "C" fn kmain() -> !
 
   let mut fb_addr = fb.addr() as u64;
   let fb_phy = fb_addr - hhdm_offset;
+  let fb_stride = fb.pitch();
 
   syscalls::syscalls_initialize();
 
@@ -143,17 +144,43 @@ pub extern "C" fn kmain() -> !
   let (_, psf_file) = ustar.iter().find_file("./resources/zap-vga.psf").unwrap();
   let psf = Psf::new(NonNull::new(psf_file.as_ptr() as *mut u8).unwrap()).unwrap();
 
+  serial
+    .write_fmt(format_args!(
+      "height {} count {}\n",
+      psf.height(),
+      psf.get_glyph_count()
+    ))
+    .unwrap();
+
+  let fb =
+    unsafe { core::slice::from_raw_parts_mut(fb_addr as *mut u32, buf_len / size_of::<u32>()) };
+  let glyph_width = psf.width();
+
+  let mut x_offset = 0;
+  for c in 0..127
+  {
+    let glyph = psf.get_glyph(c.into()).unwrap().expand(u32::MAX, 0);
+    for i in 0..glyph.len()
+    {
+      let row = i / glyph_width;
+      let col = i % glyph_width;
+      fb[row * (fb_stride as usize / 4) + col + x_offset] = glyph[i];
+    }
+    x_offset += glyph_width;
+  }
+
   for bus in 0..255
   {
     for device in 0..32
     {
-      let dev = PciDevice::new(bus, device, 0);
+      let dev = PciDeviceAddress::new(bus, device, 0).unwrap();
       if dev.exists()
       {
         serial
           .write_fmt(format_args!(
-            "Device at {bus}:{device}: {:?}\n",
-            dev.get_device_type()
+            "Device at {bus}:{device}: {:?} Multi-function? {}\n",
+            dev.get_device_type(),
+            dev.is_multi_function()
           ))
           .unwrap();
       }

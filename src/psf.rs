@@ -38,6 +38,9 @@ struct Psf2
   /// height of glyphs
   height: u32,
 
+  /// size of glyph in bytes
+  glyph_size: u32,
+
   /// width of glyphs,
   width: u32,
 }
@@ -126,7 +129,7 @@ pub struct Glyph
 
 pub struct Psf
 {
-  data: NonNull<u8>,
+  pub data: NonNull<u8>,
 
   header: PsfHeader,
 }
@@ -139,7 +142,16 @@ impl Psf
   pub fn new(data: NonNull<u8>) -> Result<Self, PsfError>
   {
     let header = PsfHeader::parse(data)?;
-    Ok(Self { data, header })
+    let header_size = match &header
+    {
+      PsfHeader::Psf1(_) => size_of::<Psf1>(),
+      PsfHeader::Psf2(_) => size_of::<Psf2>(),
+    };
+
+    Ok(Self {
+      data: unsafe { data.byte_add(header_size) },
+      header,
+    })
   }
   pub fn is_unicode(&self) -> bool
   {
@@ -171,7 +183,7 @@ impl Psf
     match &self.header
     {
       PsfHeader::Psf1(psf1) => psf1.glyph_size as usize,
-      PsfHeader::Psf2(psf2) => ((psf2.width.next_multiple_of(8) * psf2.height) / 8) as usize,
+      PsfHeader::Psf2(psf2) => psf2.glyph_size as usize,
     }
   }
 
@@ -181,6 +193,10 @@ impl Psf
     if !character.is_ascii()
     {
       return Err(PsfError::InvalidGlyph);
+    }
+    if character.is_control()
+    {
+      return self.get_glyph(' ');
     }
 
     let stride = self.glyph_stride();
@@ -220,7 +236,7 @@ impl Glyph
   #[inline]
   pub fn expand(&self, fg_color: u32, bg_color: u32) -> Vec<u32>
   {
-    let row_stride = self.width.next_multiple_of(8);
+    let row_stride = self.width.next_multiple_of(8) / 8;
     let rows = self.bitmask.chunks(row_stride);
     rows
       .into_iter()
@@ -228,8 +244,9 @@ impl Glyph
         let mut expanded = vec![];
         for x in 0..self.width
         {
-          let byte = row[x / 8];
-          let on = (byte >> (x % 8)) & 0x1 == 0;
+          let actual = self.width - x - 1;
+          let byte = row[actual / 8];
+          let on = (byte >> (actual % 8)) & 0x1 == 1;
           if on
           {
             expanded.push(fg_color);
