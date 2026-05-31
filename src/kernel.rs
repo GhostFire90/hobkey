@@ -1,3 +1,4 @@
+use core::arch::asm;
 use core::fmt::{self, Write};
 use core::ptr::NonNull;
 
@@ -19,7 +20,7 @@ use crate::syscalls;
 use crate::timers::apic::MADT;
 
 #[no_mangle]
-pub extern "C" fn kmain() -> !
+pub extern "C" fn kmain()
 {
   let mut serial = Serial::new(serial::COM0).unwrap();
   // gotta figure this out lmao
@@ -227,7 +228,4 @@ pub extern "C" fn kmain() -> !
       }
     }
   }
-
-  loop
-  {}
 }

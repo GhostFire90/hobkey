@@ -33,4 +33,5 @@
         call get_phybit
         call kmain
         lp:
+        hlt
         jmp lp
